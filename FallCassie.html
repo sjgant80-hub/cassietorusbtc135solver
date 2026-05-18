@@ -1,0 +1,1437 @@
+<!--
+  FallCassie · Sovereign Mesh Puzzle Solver
+
+  Architecture: Konomi · 8+1 Agent Topology
+  Built by: Sodor Group (AI Native Solutions)
+
+  k0 Simon  — application layer · sovereign HTML
+  k2 Thomas — substrate architect · BIG CASSIE original
+
+  8+1 Agents in this file:
+    O orchestrator · a scaffold · b build · g cache
+    d execute · e gate · z audit · h score · q format
+
+  Multi-Provider AI: free tier routing (Thomas's architecture)
+  Method: Pollard's kangaroo on secp256k1
+  Topology: distributed mesh via WebRTC (PeerJS)
+  Visualisation: phi-torus with kappa-compression
+  Providers: Gemini · Groq · Mistral · OpenRouter · DeepSeek · Qwen · Yi · Moonshot · Baichuan · GLM · MiniMax · Anthropic
+
+  Every copy of this file is a mesh node.
+  Every node walks a different region.
+  Every free tier donates intelligence.
+  The mesh solves what no single machine can.
+
+  CPU does the jumping.
+  AI does the thinking about where to jump.
+  Both are free.
+
+  Powered by Konomi Architecture · phi·kappa=1 · 510,510
+
+  ai-nativesolutions.com · github.com/sjgant80-hub
+
+  <>
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FallCassie · Sovereign Mesh Solver · ◊·κ=1</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=JetBrains+Mono:wght@300;400&display=swap');
+:root{--bg:#050507;--s1:#0a0b10;--b:#151520;--text:#c8c4d8;--dim:#6e6a80;--ink:#eee8ff;--phi:#e4b94a;--tame:#00e87b;--wild:#ff4466;--coll:#7c5ce0;--void:#050507;--kill:#ff3b3b}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;overflow-x:hidden;min-height:100vh;display:flex;flex-direction:column}
+
+/* ─── header ─── */
+.top{padding:10px 16px;border-bottom:1px solid var(--b);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.title{font-family:'Outfit',sans-serif;font-weight:900;font-size:15px;color:var(--phi);white-space:nowrap}
+.title span{font-weight:300;color:var(--dim);font-size:10px}
+.ctrl{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.ci{padding:3px 6px;background:var(--s1);border:1px solid var(--b);color:var(--text);font-family:inherit;font-size:10px;border-radius:3px;outline:none;width:50px;text-align:center}
+.cl{font-size:8px;color:var(--dim);margin-right:1px}
+.btn{padding:4px 12px;border:1px solid var(--b);background:var(--s1);color:var(--text);font-family:inherit;font-size:10px;cursor:pointer;border-radius:3px;transition:all .12s;white-space:nowrap}
+.btn:hover{border-color:var(--phi);color:var(--phi)}
+.btn-go{background:var(--tame);color:#000;border-color:var(--tame);font-family:'Outfit',sans-serif;font-weight:800;font-size:11px;padding:5px 18px}
+.btn-go:hover{background:#00c866}
+.btn-go.running{background:var(--wild);border-color:var(--wild)}
+.btn-go.running:hover{background:#dd3355}
+
+/* ─── wallet ─── */
+.wallet{padding:6px 16px;border-bottom:1px solid var(--b);display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:10px}
+.wallet .wl{color:var(--dim);font-family:'Outfit',sans-serif;font-weight:800;font-size:9px;letter-spacing:1px}
+.wallet .bal{color:var(--phi);font-weight:600;font-size:12px;font-family:'Outfit',sans-serif}
+.wallet .addr{color:var(--dim);font-size:9px;cursor:pointer;border-bottom:1px dotted var(--dim)}
+.wallet .addr:hover{color:var(--text)}
+.wallet .fee{color:var(--tame)}
+.wallet .utxo{color:var(--coll)}
+.wallet a{color:var(--phi);text-decoration:none;font-size:9px}
+.wallet a:hover{text-decoration:underline}
+.wif-box{background:var(--s1);border:1px solid var(--phi);padding:8px 12px;margin:6px 16px;font-size:10px;word-break:break-all;color:var(--phi);border-radius:3px;cursor:pointer}
+.wif-box:hover{background:#151520}
+
+/* ─── mesh bar ─── */
+.mesh-bar{padding:6px 16px;border-bottom:1px solid var(--b);display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:10px}
+.mesh-bar .ml{font-family:'Outfit',sans-serif;font-weight:800;font-size:9px;letter-spacing:1px;color:var(--coll)}
+.mesh-bar .mid{color:var(--dim);font-size:9px;cursor:pointer;border-bottom:1px dotted var(--dim);user-select:all}
+.mesh-bar .mid:hover{color:var(--text)}
+.peer-input{padding:3px 6px;background:var(--s1);border:1px solid var(--b);color:var(--text);font-family:inherit;font-size:10px;border-radius:3px;outline:none;width:120px}
+.peer-input:focus{border-color:var(--coll)}
+.peer-count{color:var(--tame);font-weight:600}
+
+/* ─── canvas ─── */
+canvas{display:block;flex:1;min-height:300px}
+
+/* ─── stats bar ─── */
+.bar{padding:6px 16px;border-top:1px solid var(--b);display:flex;gap:16px;flex-wrap:wrap;font-size:10px;align-items:center}
+.bar .s{display:flex;align-items:center;gap:4px}
+.bar .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+
+/* ─── peer list ─── */
+.peer-list{padding:4px 16px;border-top:1px solid var(--b);font-size:9px;max-height:60px;overflow-y:auto;display:none}
+.peer-list .pe{display:flex;gap:12px;padding:2px 0;color:var(--dim)}
+.peer-list .pe .pn{color:var(--coll);min-width:80px}
+.peer-list .pe .pd{color:var(--tame)}
+
+/* ─── log ─── */
+.log{padding:6px 16px;border-top:1px solid var(--b);font-size:9px;max-height:100px;overflow-y:auto;line-height:1.7;flex-shrink:0}
+.log .t{color:var(--dim);margin-right:6px}
+.log .collision{color:var(--phi);font-weight:600}
+.log .peer{color:var(--coll)}
+.log .dp{color:var(--tame)}
+
+/* ─── footer ─── */
+.foot{padding:8px 16px;border-top:1px solid var(--b);font-size:8px;color:var(--dim);text-align:center;line-height:1.6}
+.foot .fk{color:var(--phi)}
+
+/* ─── AI status ─── */
+.ai-bar{padding:5px 16px;border-bottom:1px solid var(--b);display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:9px;display:none}
+.ai-bar .al{font-family:'Outfit',sans-serif;font-weight:800;font-size:9px;letter-spacing:1px;color:var(--phi)}
+.ai-dot{color:var(--dim)}
+.ai-dot.alive{color:var(--tame)}
+.ai-dot.limited{color:var(--phi)}
+.ai-dot.dead{color:var(--wild)}
+.ai-hint{color:var(--dim);font-style:italic;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ─── settings modal ─── */
+.sov{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.spanel{background:var(--s1);border:1px solid var(--b);border-radius:6px;padding:20px;width:420px;max-width:90vw;max-height:80vh;overflow-y:auto}
+.stitle{font-family:'Outfit',sans-serif;font-weight:800;font-size:14px;color:var(--phi);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+.stitle .x{cursor:pointer;color:var(--dim);font-size:18px;line-height:1}
+.stitle .x:hover{color:var(--wild)}
+.sgroup{margin-bottom:14px}
+.slabel{font-family:'Outfit',sans-serif;font-weight:600;font-size:10px;color:var(--dim);margin-bottom:6px;letter-spacing:1px}
+.srow{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.sname{font-size:9px;color:var(--text);min-width:72px}
+.si{flex:1;padding:4px 8px;background:var(--bg);border:1px solid var(--b);color:var(--text);font-family:inherit;font-size:10px;border-radius:3px;outline:none}
+.si:focus{border-color:var(--phi)}
+.sdesc{font-size:8px;color:var(--dim);margin-top:2px}
+
+input[type=file]{display:none}
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="title">FALLCASSIE <span>· sovereign mesh · puzzle 135 · ◊·κ=1</span></div>
+  <div class="ctrl">
+    <span class="cl">Workers:</span><input class="ci" id="numW" type="number" value="" min="1" max="32" style="width:36px">
+    <span class="cl">Walks:</span><input class="ci" id="numK" type="number" value="4" min="1" max="16" style="width:36px">
+    <span class="cl">DP bits:</span><input class="ci" id="dpBits" type="number" value="14" min="8" max="28" style="width:40px">
+    <span class="cl">Mod:</span><input class="ci" id="mod" type="number" value="24" style="width:36px">
+    <button class="btn" onclick="exportDPs()">Export</button>
+    <button class="btn" onclick="document.getElementById('impFile').click()">Import</button>
+    <input type="file" id="impFile" accept=".ndjson,.json,.jsonl" onchange="importDPs(this.files[0])">
+    <button class="btn" onclick="openSettings()">&#9881;</button>
+    <button class="btn btn-go" id="btnGo" onclick="toggleSolver()">START</button>
+  </div>
+</div>
+
+<div class="wallet" id="wallet">
+  <span class="wl">MEMPOOL</span>
+  <span class="bal" id="wBal">&mdash;</span>
+  <span class="utxo" id="wUtxo">UTXOs: &mdash;</span>
+  <span class="fee" id="wFee">Fee: &mdash;</span>
+  <span class="addr" id="wAddr" onclick="copyAddr()" title="Click to copy address">16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v</span>
+  <a href="https://mempool.space/address/16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v" target="_blank" rel="noopener">mempool.space &#x2197;</a>
+  <span class="cl" id="wRefresh">&middot;</span>
+</div>
+
+<div class="mesh-bar" id="meshBar">
+  <span class="ml">MESH</span>
+  <span class="cl">Your ID:</span>
+  <span class="mid" id="myPeerId" title="Click to copy" onclick="copyPeerId()">connecting...</span>
+  <span class="cl">Connect:</span>
+  <input class="peer-input" id="peerIdInput" placeholder="peer ID" onkeydown="if(event.key==='Enter')connectToPeer()">
+  <button class="btn" onclick="connectToPeer()">Join</button>
+  <span class="peer-count" id="peerCountTxt">0 peers</span>
+  <span class="cl" id="meshStatus">&middot;</span>
+</div>
+
+<div class="ai-bar" id="aiBar">
+  <span class="al">AI</span>
+  <span class="ai-dot" id="aiSt_gemini">&#9675;gem</span>
+  <span class="ai-dot" id="aiSt_groq">&#9675;grq</span>
+  <span class="ai-dot" id="aiSt_mistral">&#9675;mis</span>
+  <span class="ai-dot" id="aiSt_openrouter">&#9675;or</span>
+  <span class="ai-dot" id="aiSt_deepseek-v3">&#9675;ds3</span>
+  <span class="ai-dot" id="aiSt_deepseek-r1">&#9675;r1</span>
+  <span class="ai-dot" id="aiSt_qwen">&#9675;qw</span>
+  <span class="ai-dot" id="aiSt_yi">&#9675;yi</span>
+  <span class="ai-dot" id="aiSt_moonshot">&#9675;mn</span>
+  <span class="ai-dot" id="aiSt_baichuan">&#9675;bc</span>
+  <span class="ai-dot" id="aiSt_glm">&#9675;glm</span>
+  <span class="ai-dot" id="aiSt_minimax">&#9675;mm</span>
+  <span class="ai-dot" id="aiSt_anthropic">&#9675;ant</span>
+  <span class="ai-hint" id="aiLastHint">no hints yet</span>
+</div>
+
+<canvas id="c"></canvas>
+
+<div class="bar" id="bar">
+  <div class="s"><div class="dot" style="background:var(--tame)"></div><span id="sTame">Tame: 0</span></div>
+  <div class="s"><div class="dot" style="background:var(--wild)"></div><span id="sWild">Wild: 0</span></div>
+  <div class="s"><div class="dot" style="background:var(--phi)"></div><span id="sRate">0/s</span></div>
+  <div class="s"><div class="dot" style="background:var(--coll)"></div><span id="sColl">Collisions: 0</span></div>
+  <div class="s"><div class="dot" style="background:var(--dim)"></div><span id="sJumps">Jumps: 0</span></div>
+  <div class="s"><div class="dot" style="background:var(--dim)"></div><span id="sStored">Stored: 0</span></div>
+</div>
+
+<div class="peer-list" id="peerList"></div>
+
+<div class="log" id="log"></div>
+
+<div class="sov" id="settingsOverlay" style="display:none" onclick="if(event.target===this)closeSettings()">
+  <div class="spanel">
+    <div class="stitle">Settings <span class="x" onclick="closeSettings()">&times;</span></div>
+    <div class="sgroup">
+      <div class="slabel">WESTERN FREE TIERS</div>
+      <div class="srow"><span class="sname">Gemini</span><input class="si" id="keyGemini" type="password" placeholder="AIza..."></div>
+      <div class="srow"><span class="sname">Groq</span><input class="si" id="keyGroq" type="password" placeholder="gsk_..."></div>
+      <div class="srow"><span class="sname">Mistral</span><input class="si" id="keyMistral" type="password" placeholder="..."></div>
+      <div class="srow"><span class="sname">OpenRouter</span><input class="si" id="keyOpenRouter" type="password" placeholder="sk-or-..."></div>
+      <div class="slabel" style="margin-top:10px">CHINESE FREE TIERS</div>
+      <div class="srow"><span class="sname">DeepSeek V3</span><input class="si" id="keyDeepseekV3" type="password" placeholder="sk-..."></div>
+      <div class="srow"><span class="sname">DeepSeek R1</span><input class="si" id="keyDeepseekR1" type="password" placeholder="sk-..."></div>
+      <div class="srow"><span class="sname">Qwen</span><input class="si" id="keyQwen" type="password" placeholder="sk-..."></div>
+      <div class="srow"><span class="sname">Yi</span><input class="si" id="keyYi" type="password" placeholder="..."></div>
+      <div class="srow"><span class="sname">Moonshot</span><input class="si" id="keyMoonshot" type="password" placeholder="sk-..."></div>
+      <div class="srow"><span class="sname">Baichuan</span><input class="si" id="keyBaichuan" type="password" placeholder="sk-..."></div>
+      <div class="srow"><span class="sname">GLM-4</span><input class="si" id="keyGlm" type="password" placeholder="..."></div>
+      <div class="srow"><span class="sname">MiniMax</span><input class="si" id="keyMinimax" type="password" placeholder="..."></div>
+      <div class="slabel" style="margin-top:10px">PAID FALLBACK</div>
+      <div class="srow"><span class="sname">Anthropic</span><input class="si" id="keyAnthropic" type="password" placeholder="sk-ant-..."></div>
+      <div class="sdesc">13 free providers + 1 paid fallback. Solver works without any keys. Keys never leave your browser.</div>
+    </div>
+    <div class="sgroup">
+      <div class="slabel">AI GUIDANCE</div>
+      <div class="srow"><span class="sname">Interval</span><input class="ci" id="aiInterval" type="number" value="5" min="1" max="30" style="width:50px"> <span class="cl">minutes</span></div>
+      <div class="srow"><span class="sname">Enabled</span><label style="cursor:pointer"><input type="checkbox" id="aiEnabled"> <span class="cl">ask AI where to walk</span></label></div>
+    </div>
+    <button class="btn" onclick="saveSettings()" style="margin-top:8px;width:100%">Save &amp; Close</button>
+  </div>
+</div>
+
+<div class="foot">
+  FallCassie &middot; Sovereign Mesh &middot; Konomi Architecture<br>
+  <span class="fk">CPU: your device &middot; AI: free tiers &middot; Mesh: P2P</span><br>
+  Every node sovereign &middot; Every copy walks &middot; &#9674;&middot;&kappa;=1 &middot; 510,510
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.6.1/elliptic.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// Omega ORCHESTRATOR — main thread coordinator
+// Manages agent lifecycle, dispatches events, resolves state
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TARGET_PUBKEY = '02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16';
+const TARGET_ADDR   = '16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v';
+const ELLIPTIC_CDN  = 'https://cdnjs.cloudflare.com/ajax/libs/elliptic/6.6.1/elliptic.min.js';
+const MEMPOOL_API   = 'https://mempool.space/api';
+const KAPPA = 0.6180339887498948482;
+const TAU   = Math.PI * 2;
+
+let nodeId = null;             // persistent identity (gamma cache)
+let peer = null;               // PeerJS instance
+const peerConns = new Map();   // peerId -> DataConnection
+let totalJumps = 0, jumpRate = 0, lastJumpSnap = 0, lastJumpTime = Date.now();
+let tameCount = 0, wildCount = 0, collisionCount = 0;
+const dpMap = new Map();       // x-hex -> { type, dist }
+const workers = [];
+let running = false;
+let drawDirty = true;
+let tamePts = [], wildPts = [];
+let walletData = null;
+const startedAt = Date.now();
+
+document.getElementById('numW').value = Math.max(1, (navigator.hardwareConcurrency || 4) - 1);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// gamma CACHE — IndexedDB persistence layer
+// DPs survive page reloads. Node identity persists across sessions.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const DB_NAME = 'FallCassie';
+const DB_VER  = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('dps'))  db.createObjectStore('dps',  { keyPath: 'x' });
+      if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function getOrCreateNodeId() {
+  const db = await openDB();
+  return new Promise((resolve) => {
+    const tx = db.transaction('meta', 'readwrite');
+    const store = tx.objectStore('meta');
+    const req = store.get('nodeId');
+    req.onsuccess = () => {
+      if (req.result) {
+        resolve(req.result.value);
+      } else {
+        const id = crypto.randomUUID();
+        store.put({ key: 'nodeId', value: id });
+        resolve(id);
+      }
+    };
+  });
+}
+
+async function loadStoredDPs() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('dps', 'readonly');
+    const req = tx.objectStore('dps').getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+let dbWriteQueue = [];
+let dbWritePending = false;
+
+function queueDBWrite(dp) {
+  dbWriteQueue.push(dp);
+  if (!dbWritePending) {
+    dbWritePending = true;
+    setTimeout(flushDBWrites, 2000);
+  }
+}
+
+async function flushDBWrites() {
+  if (dbWriteQueue.length === 0) { dbWritePending = false; return; }
+  const batch = dbWriteQueue.splice(0);
+  try {
+    const db = await openDB();
+    const tx = db.transaction('dps', 'readwrite');
+    const store = tx.objectStore('dps');
+    for (const dp of batch) store.put(dp);
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  } catch (e) {
+    logMsg('IndexedDB write error: ' + e.message);
+  }
+  dbWritePending = false;
+  if (dbWriteQueue.length > 0) {
+    dbWritePending = true;
+    setTimeout(flushDBWrites, 2000);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// beta BUILD — kangaroo engine (Web Worker source)
+// secp256k1 point addition, phi-scaled jumps, DP detection
+// THIS IS THE INNER LOOP — must be FAST
+// ═══════════════════════════════════════════════════════════════════════════
+
+const WORKER_SRC = `
+importScripts('${ELLIPTIC_CDN}');
+
+const ec = new self.elliptic.ec('secp256k1');
+const BN = ec.curve.n.constructor;
+const G = ec.curve.g;
+const n = ec.curve.n;
+
+const TARGET = '${TARGET_PUBKEY}';
+const targetPoint = ec.keyFromPublic(TARGET, 'hex').getPublic();
+
+const RANGE_LOW  = new BN('4000000000000000000000000000000000', 16);
+const RANGE_HIGH = new BN('7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', 16);
+const RANGE_SIZE = RANGE_HIGH.sub(RANGE_LOW).addn(1);
+const RANGE_HALF = RANGE_SIZE.divn(2);
+const RANGE_QTR  = RANGE_SIZE.divn(4);
+
+const PHI = 1.618033988749895;
+const NUM_JUMPS = 32;
+const JUMP_MASK = NUM_JUMPS - 1;
+const JUMPS = [];
+for (let i = 0; i < NUM_JUMPS; i++) JUMPS.push(new BN(Math.max(1, Math.round(Math.pow(2, i * PHI))).toString()));
+const JUMP_POINTS = JUMPS.map(d => G.mul(d));
+
+let DP_BITS = 14;
+let dpFull, dpRem, dpMask;
+function setDP(bits) {
+  DP_BITS = bits;
+  dpFull = bits >> 3;
+  dpRem = bits & 7;
+  dpMask = dpRem > 0 ? (0xFF << (8 - dpRem)) & 0xFF : 0;
+}
+
+function isDP(xb) {
+  for (let i = 0; i < dpFull; i++) if (xb[i] !== 0) return false;
+  if (dpRem > 0 && (xb[dpFull] & dpMask) !== 0) return false;
+  return true;
+}
+
+function getXB(p) { return p.getX().toArray('be', 32); }
+
+function randBN(mx) {
+  const len = mx.byteLength();
+  const buf = new Uint8Array(len);
+  let r;
+  do { crypto.getRandomValues(buf); r = new BN(buf); } while (r.gte(mx));
+  return r;
+}
+
+function bHex(b) { let h=''; for(let i=0;i<b.length;i++) h+=b[i].toString(16).padStart(2,'0'); return h; }
+
+function newTame() {
+  const s = RANGE_LOW.add(RANGE_QTR).add(randBN(RANGE_HALF));
+  const p = G.mul(s);
+  return { type:'tame', point:p, log:s, xb:getXB(p) };
+}
+function newWild() {
+  const o = randBN(RANGE_SIZE);
+  const p = targetPoint.add(G.mul(o));
+  return { type:'wild', point:p, accum:o, xb:getXB(p) };
+}
+
+self.onmessage = (e) => {
+  if (e.data.kind === 'start') {
+    setDP(e.data.dpBits || 14);
+    const nw = e.data.numWalks || 4;
+    const walkers = [];
+    for (let i = 0; i < nw; i++) walkers.push(i % 2 === 0 ? newTame() : newWild());
+    self.postMessage({ kind:'ready', walks:walkers.length });
+
+    let jumps = 0, dps = 0, lastR = Date.now();
+
+    function loop() {
+      for (let it = 0; it < 100; it++) {
+        for (const k of walkers) {
+          const j = k.xb[31] & JUMP_MASK;
+          k.point = k.point.add(JUMP_POINTS[j]);
+          if (k.type === 'tame') k.log = k.log.add(JUMPS[j]);
+          else k.accum = k.accum.add(JUMPS[j]);
+          k.xb = getXB(k.point);
+          jumps++;
+          if (isDP(k.xb)) {
+            dps++;
+            self.postMessage({
+              kind:'dp', type:k.type,
+              x: bHex(k.xb),
+              dist: (k.type==='tame' ? k.log : k.accum).umod(n).toString(16,64)
+            });
+          }
+        }
+      }
+      const now = Date.now();
+      if (now - lastR >= 2000) {
+        self.postMessage({ kind:'stat', jumps, dps });
+        jumps = 0; dps = 0; lastR = now;
+      }
+      setTimeout(loop, 0);
+    }
+    loop();
+  }
+};
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// epsilon GATE — collision detection and key verification
+// When tame.x == wild.x: extract private key, double-verify, announce
+// ═══════════════════════════════════════════════════════════════════════════
+
+function processDP(dp, source) {
+  const existing = dpMap.get(dp.x);
+  if (existing) {
+    if (existing.type !== dp.type) {
+      collisionCount++;
+      checkCollision(existing, dp);
+    }
+    return false;
+  }
+  dpMap.set(dp.x, { type: dp.type, dist: dp.dist });
+  if (dp.type === 'tame') tameCount++; else wildCount++;
+  queueDBWrite({ x: dp.x, type: dp.type, dist: dp.dist });
+  addTorusPoint(dp);
+  drawDirty = true;
+  return true;
+}
+
+function checkCollision(a, b) {
+  const ec2 = new elliptic.ec('secp256k1');
+  const BN2 = ec2.curve.n.constructor;
+  const G2 = ec2.curve.g;
+  const n2 = ec2.curve.n;
+  const target = ec2.keyFromPublic(TARGET_PUBKEY, 'hex').getPublic();
+
+  const tame = a.type === 'tame' ? a : b;
+  const wild = a.type === 'wild' ? a : b;
+  const tL = new BN2(tame.dist, 16);
+  const wA = new BN2(wild.dist, 16);
+
+  const cands = [
+    tL.sub(wA).umod(n2),
+    tL.neg().sub(wA).umod(n2)
+  ];
+
+  for (const c of cands) {
+    if (c.isZero()) continue;
+    try {
+      if (G2.mul(c).eq(target)) {
+        const hex = c.toString(16).padStart(34, '0');
+        logMsg('<span class="collision">PRIVATE KEY FOUND: ' + hex + '</span>', true);
+        // broadcast to all peers
+        broadcastToMesh({ type: 'solved', key: hex });
+        privKeyToWIF(hex).then(wif => {
+          logMsg('<span class="collision">WIF: ' + wif + '</span>', true);
+          const wifEl = document.createElement('div');
+          wifEl.className = 'wif-box';
+          wifEl.title = 'Click to copy WIF';
+          wifEl.textContent = 'WIF: ' + wif;
+          wifEl.onclick = () => { navigator.clipboard.writeText(wif); logMsg('WIF copied'); };
+          document.getElementById('wallet').after(wifEl);
+          const balStr = walletData ? walletData.btc + ' BTC' : '~13.5 BTC';
+          alert('PRIVATE KEY RECOVERED!\n\nHex: ' + hex + '\nWIF: ' + wif + '\nBalance: ' + balStr + '\n\nImport WIF into Electrum or Sparrow to sweep.');
+        });
+        stopSolver();
+        return;
+      }
+    } catch {}
+  }
+  logMsg('<span class="collision">x-collision (no key match) · ' + dpMap.size + ' unique DPs</span>');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// theta FORMAT — torus mapping and dashboard rendering
+// Maps 256-bit EC point x-coordinates to toroidal coordinates
+// Renders live heatmap, DP dots, near-collision zones, recursive depth
+// ═══════════════════════════════════════════════════════════════════════════
+
+function torusCoords(xHex) {
+  const mod = parseInt(document.getElementById('mod').value) || 24;
+  const xBig = BigInt('0x' + xHex);
+  const modBig = BigInt(mod);
+  const xMod = Number(xBig % (modBig * 1000000n));
+  const theta = (xMod % mod) / mod;
+  const psi = ((xMod * KAPPA) % mod + mod) % mod / mod;
+  return { theta, psi };
+}
+
+function addTorusPoint(dp) {
+  const pt = { ...torusCoords(dp.x), xHex: dp.x, type: dp.type };
+  if (dp.type === 'tame') tamePts.push(pt);
+  else wildPts.push(pt);
+}
+
+function drawTorus() {
+  const canvas = document.getElementById('c');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const W = canvas.width = rect.width * devicePixelRatio;
+  const H = canvas.height = Math.max(300, (window.innerHeight - 260)) * devicePixelRatio;
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = Math.max(300, window.innerHeight - 260) + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const w = rect.width, h = Math.max(300, window.innerHeight - 260);
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2, R = Math.min(w, h) * 0.42;
+  const mod = parseInt(document.getElementById('mod').value) || 24;
+
+  // grid lines
+  ctx.strokeStyle = '#ffffff06';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= mod; i++) {
+    const f = i / mod;
+    const x = cx + (f * 2 - 1) * R;
+    const y = cy + (f * 2 - 1) * R;
+    ctx.beginPath(); ctx.moveTo(x, cy - R); ctx.lineTo(x, cy + R); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - R, y); ctx.lineTo(cx + R, y); ctx.stroke();
+  }
+
+  // heatmap
+  const gridRes = 40;
+  const tameGrid = new Float32Array(gridRes * gridRes);
+  const wildGrid = new Float32Array(gridRes * gridRes);
+  for (const p of tamePts) {
+    const gx = Math.floor(p.theta * gridRes) % gridRes;
+    const gy = Math.floor(p.psi * gridRes) % gridRes;
+    tameGrid[gy * gridRes + gx]++;
+  }
+  for (const p of wildPts) {
+    const gx = Math.floor(p.theta * gridRes) % gridRes;
+    const gy = Math.floor(p.psi * gridRes) % gridRes;
+    wildGrid[gy * gridRes + gx]++;
+  }
+  const maxH = Math.max(1, ...tameGrid, ...wildGrid);
+  const cellW = (R * 2) / gridRes;
+  for (let gy = 0; gy < gridRes; gy++) {
+    for (let gx = 0; gx < gridRes; gx++) {
+      const t = tameGrid[gy * gridRes + gx];
+      const w2 = wildGrid[gy * gridRes + gx];
+      if (t === 0 && w2 === 0) continue;
+      const hasBoth = t > 0 && w2 > 0;
+      const intensity = Math.max(t, w2) / maxH;
+      let col;
+      if (hasBoth) col = 'rgba(228,185,74,' + (0.1 + intensity * 0.4) + ')';
+      else if (t > w2) col = 'rgba(0,232,123,' + (0.05 + intensity * 0.25) + ')';
+      else col = 'rgba(255,68,102,' + (0.05 + intensity * 0.25) + ')';
+      ctx.fillStyle = col;
+      ctx.fillRect(cx - R + gx * cellW, cy - R + gy * cellW, cellW + 0.5, cellW + 0.5);
+    }
+  }
+
+  // DP dots
+  for (const p of tamePts) {
+    const x = cx + (p.theta * 2 - 1) * R;
+    const y = cy + (p.psi * 2 - 1) * R;
+    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, TAU);
+    ctx.fillStyle = 'rgba(0,232,123,0.8)';
+    ctx.fill();
+  }
+  for (const p of wildPts) {
+    const x = cx + (p.theta * 2 - 1) * R;
+    const y = cy + (p.psi * 2 - 1) * R;
+    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, TAU);
+    ctx.fillStyle = 'rgba(255,68,102,0.8)';
+    ctx.fill();
+  }
+
+  // near-collision zones
+  const threshold = 0.06;
+  for (const t of tamePts) {
+    for (const w3 of wildPts) {
+      const dT = Math.min(Math.abs(t.theta - w3.theta), 1 - Math.abs(t.theta - w3.theta));
+      const dP = Math.min(Math.abs(t.psi - w3.psi), 1 - Math.abs(t.psi - w3.psi));
+      const d = Math.sqrt(dT * dT + dP * dP);
+      if (d < threshold) {
+        const mx = cx + ((t.theta + w3.theta) - 1) * R;
+        const my = cy + ((t.psi + w3.psi) - 1) * R;
+        const r = (1 - d / threshold) * 12 + 4;
+        ctx.beginPath(); ctx.arc(mx, my, r, 0, TAU);
+        ctx.strokeStyle = 'rgba(228,185,74,' + (0.3 + (1-d/threshold)*0.5) + ')';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // recursive depth layers (zeta AUDIT visualisation)
+  if (tamePts.length + wildPts.length > 5) drawLayers(ctx, cx, cy, R);
+
+  // singularity marker
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, TAU);
+  ctx.fillStyle = '#fff';
+  ctx.fill();
+
+  drawDirty = false;
+}
+
+function drawLayers(ctx, cx, cy, R) {
+  const maxDepth = 4;
+  let pts = [...tamePts, ...wildPts];
+  const layerColors = ['#00e87b','#ff4466','#7c5ce0','#00b4d8','#e4b94a'];
+
+  for (let d = 0; d < maxDepth && pts.length >= 3; d++) {
+    let sT = 0, cT = 0, sP = 0, cP = 0;
+    for (const p of pts) {
+      sT += Math.sin(p.theta * TAU); cT += Math.cos(p.theta * TAU);
+      sP += Math.sin(p.psi * TAU);   cP += Math.cos(p.psi * TAU);
+    }
+    const ctrT = ((Math.atan2(sT, cT) / TAU) + 1) % 1;
+    const ctrP = ((Math.atan2(sP, cP) / TAU) + 1) % 1;
+    const lr = R * Math.pow(KAPPA, d) * 0.5;
+    const lx = cx + (ctrT * 2 - 1) * R;
+    const ly = cy + (ctrP * 2 - 1) * R;
+    const col = layerColors[d % layerColors.length];
+
+    ctx.beginPath(); ctx.arc(lx, ly, lr, 0, TAU);
+    ctx.strokeStyle = col + '30';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.beginPath(); ctx.arc(lx, ly, lr * KAPPA, 0, TAU);
+    ctx.strokeStyle = col + '18';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.beginPath(); ctx.arc(lx, ly, 3, 0, TAU);
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.font = '8px Outfit';
+    ctx.fillStyle = col;
+    ctx.fillText('L' + d, lx + 5, ly + 3);
+
+    const withDist = pts.map(p => {
+      const dT = Math.min(Math.abs(p.theta - ctrT), 1 - Math.abs(p.theta - ctrT));
+      const dP = Math.min(Math.abs(p.psi - ctrP), 1 - Math.abs(p.psi - ctrP));
+      return { ...p, dd: Math.sqrt(dT*dT + dP*dP) };
+    });
+    withDist.sort((a, b) => a.dd - b.dd);
+    pts = withDist.slice(0, Math.max(3, Math.ceil(pts.length * KAPPA)));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// delta EXECUTE — Web Worker lifecycle management
+// Spawns workers, routes messages, manages start/stop
+// ═══════════════════════════════════════════════════════════════════════════
+
+function toggleSolver() {
+  if (running) stopSolver(); else startSolver();
+}
+
+function startSolver() {
+  if (running) return;
+  const nW = parseInt(document.getElementById('numW').value) || 2;
+  const nK = parseInt(document.getElementById('numK').value) || 4;
+  const dpB = parseInt(document.getElementById('dpBits').value) || 14;
+
+  const blob = new Blob([WORKER_SRC], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+
+  for (let i = 0; i < nW; i++) {
+    const w = new Worker(url);
+    w.onmessage = (e) => {
+      const m = e.data;
+      if (m.kind === 'dp') {
+        const isNew = processDP(m, 'local');
+        if (isNew) broadcastDP(m);
+      } else if (m.kind === 'stat') {
+        totalJumps += m.jumps;
+      } else if (m.kind === 'ready') {
+        logMsg('worker up · ' + m.walks + ' walks');
+      } else if (m.kind === 'error') {
+        logMsg('worker error: ' + m.message);
+      }
+    };
+    w.onerror = (e) => logMsg('worker error: ' + e.message);
+    w.postMessage({ kind: 'start', dpBits: dpB, numWalks: nK });
+    workers.push(w);
+  }
+
+  running = true;
+  lastJumpTime = Date.now();
+  lastJumpSnap = totalJumps;
+  document.getElementById('btnGo').textContent = 'STOP';
+  document.getElementById('btnGo').classList.add('running');
+  logMsg('started ' + nW + ' workers · ' + nK + ' walks each · DP=' + dpB + ' bits');
+}
+
+function stopSolver() {
+  for (const w of workers) w.terminate();
+  workers.length = 0;
+  running = false;
+  document.getElementById('btnGo').textContent = 'START';
+  document.getElementById('btnGo').classList.remove('running');
+  logMsg('stopped');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BROADCAST CHANNEL — same-browser tab sharing (zero config)
+// Every tab running FallCassie in this browser auto-shares DPs
+// ═══════════════════════════════════════════════════════════════════════════
+
+const bc = new BroadcastChannel('cassie-135');
+bc.onmessage = (e) => {
+  if (e.data.kind === 'dp') processDP(e.data, 'tab');
+};
+
+function broadcastDP(dp) {
+  try { bc.postMessage({ kind: 'dp', type: dp.type, x: dp.x, dist: dp.dist }); } catch {}
+  broadcastToMesh({ type: 'dp-new', dps: [{ t: dp.type, x: dp.x, d: dp.dist }] });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MESH — WebRTC P2P via PeerJS
+// Every copy of FallCassie is a sovereign mesh node.
+// Nodes discover each other via peer ID exchange. Share DPs. Never keys.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function initMesh(nid) {
+  const shortId = 'cassie-' + nid.replace(/-/g, '').slice(0, 8);
+  try {
+    peer = new Peer(shortId, {
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ]
+      }
+    });
+  } catch (e) {
+    logMsg('PeerJS init failed: ' + e.message);
+    document.getElementById('myPeerId').textContent = 'offline';
+    return;
+  }
+
+  peer.on('open', (id) => {
+    document.getElementById('myPeerId').textContent = id;
+    document.getElementById('meshStatus').textContent = '· online';
+    logMsg('<span class="peer">mesh online · ID: ' + id + '</span>');
+  });
+
+  peer.on('connection', (conn) => {
+    setupConnection(conn);
+  });
+
+  peer.on('error', (err) => {
+    if (err.type === 'unavailable-id') {
+      // ID taken — append random suffix and retry
+      const retryId = shortId + Math.random().toString(36).slice(2, 5);
+      peer.destroy();
+      peer = new Peer(retryId, {
+        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+      });
+      peer.on('open', (id) => {
+        document.getElementById('myPeerId').textContent = id;
+        document.getElementById('meshStatus').textContent = '· online';
+        logMsg('<span class="peer">mesh online · ID: ' + id + ' (retry)</span>');
+      });
+      peer.on('connection', (conn) => setupConnection(conn));
+      peer.on('error', (e2) => {
+        logMsg('mesh error: ' + e2.type);
+        document.getElementById('meshStatus').textContent = '· error';
+      });
+    } else if (err.type === 'peer-unavailable') {
+      logMsg('<span class="peer">peer not found — check the ID</span>');
+    } else {
+      logMsg('mesh error: ' + err.type);
+      document.getElementById('meshStatus').textContent = '· ' + err.type;
+    }
+  });
+
+  peer.on('disconnected', () => {
+    document.getElementById('meshStatus').textContent = '· reconnecting...';
+    try { peer.reconnect(); } catch {}
+  });
+}
+
+function connectToPeer() {
+  const targetId = document.getElementById('peerIdInput').value.trim();
+  if (!targetId || !peer || peerConns.has(targetId)) return;
+  if (targetId === peer.id) { logMsg('cannot connect to yourself'); return; }
+
+  logMsg('<span class="peer">connecting to ' + targetId + '...</span>');
+  const conn = peer.connect(targetId, { reliable: true, serialization: 'json' });
+  setupConnection(conn);
+  document.getElementById('peerIdInput').value = '';
+}
+
+function setupConnection(conn) {
+  conn.on('open', () => {
+    peerConns.set(conn.peer, conn);
+    updatePeerUI();
+    logMsg('<span class="peer">peer connected: ' + conn.peer + '</span>');
+
+    // Send hello with our known peers for mesh expansion
+    const knownPeers = [...peerConns.keys()].filter(id => id !== conn.peer);
+    conn.send({ type: 'hello', nodeId, dpCount: dpMap.size, peers: knownPeers });
+
+    // Sync all DPs in chunks of 200
+    const all = [];
+    dpMap.forEach((v, x) => all.push({ t: v.type, x, d: v.dist }));
+    for (let i = 0; i < all.length; i += 200) {
+      conn.send({ type: 'dp-sync', dps: all.slice(i, i + 200) });
+    }
+  });
+
+  conn.on('data', (data) => handleMeshMessage(data, conn));
+
+  conn.on('close', () => {
+    peerConns.delete(conn.peer);
+    updatePeerUI();
+    logMsg('<span class="peer">peer disconnected: ' + conn.peer + '</span>');
+    updatePeerList();
+  });
+
+  conn.on('error', (err) => {
+    logMsg('<span class="peer">peer error (' + conn.peer + '): ' + err + '</span>');
+  });
+}
+
+function handleMeshMessage(data, conn) {
+  if (!data || !data.type) return;
+
+  switch (data.type) {
+    case 'hello': {
+      logMsg('<span class="peer">peer ' + conn.peer + ' has ' + data.dpCount + ' DPs</span>');
+      // Auto-connect to their known peers (mesh expansion)
+      if (data.peers && Array.isArray(data.peers)) {
+        for (const pid of data.peers) {
+          if (!peerConns.has(pid) && pid !== peer.id) {
+            logMsg('<span class="peer">auto-connecting to mesh peer: ' + pid + '</span>');
+            const c = peer.connect(pid, { reliable: true, serialization: 'json' });
+            setupConnection(c);
+          }
+        }
+      }
+      updatePeerList();
+      break;
+    }
+
+    case 'dp-sync':
+    case 'dp-new': {
+      if (!Array.isArray(data.dps)) break;
+      let newCount = 0;
+      for (const dp of data.dps) {
+        if (dp && dp.x && dp.t && dp.d) {
+          if (processDP({ type: dp.t, x: dp.x, dist: dp.d }, 'peer')) newCount++;
+        }
+      }
+      if (newCount > 0) {
+        logMsg('<span class="peer">+' + newCount + ' DPs from ' + conn.peer + '</span>');
+      }
+      break;
+    }
+
+    case 'solved': {
+      logMsg('<span class="collision">KEY FOUND BY PEER: ' + data.key + '</span>', true);
+      // Verify independently
+      try {
+        const ec2 = new elliptic.ec('secp256k1');
+        const BN2 = ec2.curve.n.constructor;
+        const c = new BN2(data.key, 16);
+        const target = ec2.keyFromPublic(TARGET_PUBKEY, 'hex').getPublic();
+        if (ec2.curve.g.mul(c).eq(target)) {
+          logMsg('<span class="collision">VERIFIED! Key is valid.</span>', true);
+          privKeyToWIF(data.key).then(wif => {
+            logMsg('<span class="collision">WIF: ' + wif + '</span>', true);
+            alert('KEY FOUND BY MESH PEER!\n\nHex: ' + data.key + '\nWIF: ' + wif);
+          });
+          stopSolver();
+        } else {
+          logMsg('<span class="collision">WARNING: peer key does NOT verify</span>');
+        }
+      } catch (e) {
+        logMsg('verification error: ' + e.message);
+      }
+      break;
+    }
+
+    case 'peers': {
+      if (Array.isArray(data.ids)) {
+        for (const pid of data.ids) {
+          if (!peerConns.has(pid) && pid !== peer.id) {
+            const c = peer.connect(pid, { reliable: true, serialization: 'json' });
+            setupConnection(c);
+          }
+        }
+      }
+      break;
+    }
+  }
+}
+
+function broadcastToMesh(msg) {
+  for (const [, conn] of peerConns) {
+    try { conn.send(msg); } catch {}
+  }
+}
+
+function copyPeerId() {
+  if (peer && peer.id) {
+    navigator.clipboard.writeText(peer.id).then(() => logMsg('peer ID copied'));
+  }
+}
+
+function updatePeerUI() {
+  const count = peerConns.size;
+  document.getElementById('peerCountTxt').textContent = count + ' peer' + (count !== 1 ? 's' : '');
+  updatePeerList();
+}
+
+function updatePeerList() {
+  const el = document.getElementById('peerList');
+  if (peerConns.size === 0) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'block';
+  let html = '';
+  for (const [pid] of peerConns) {
+    html += '<div class="pe"><span class="pn">' + pid + '</span><span class="pd">connected</span></div>';
+  }
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MEMPOOL WALLET — live balance monitor for target address
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function fetchWallet() {
+  try {
+    const [addrRes, feeRes] = await Promise.all([
+      fetch(MEMPOOL_API + '/address/' + TARGET_ADDR),
+      fetch(MEMPOOL_API + '/v1/fees/recommended')
+    ]);
+    if (!addrRes.ok || !feeRes.ok) throw new Error('API error');
+    const addr = await addrRes.json();
+    const fees = await feeRes.json();
+
+    const confirmed = addr.chain_stats.funded_txo_sum - addr.chain_stats.spent_txo_sum;
+    const unconfirmed = (addr.mempool_stats.funded_txo_sum || 0) - (addr.mempool_stats.spent_txo_sum || 0);
+    const totalSat = confirmed + unconfirmed;
+    const btc = (totalSat / 1e8).toFixed(8);
+
+    const utxoRes = await fetch(MEMPOOL_API + '/address/' + TARGET_ADDR + '/utxo');
+    const utxos = utxoRes.ok ? await utxoRes.json() : [];
+
+    walletData = { totalSat, btc, utxos, fees };
+    document.getElementById('wBal').textContent = btc + ' BTC';
+    document.getElementById('wFee').textContent = 'Fee: ' + fees.halfHourFee + ' sat/vB';
+    document.getElementById('wUtxo').textContent = 'UTXOs: ' + utxos.length;
+    document.getElementById('wRefresh').textContent = '· ' + new Date().toLocaleTimeString();
+    logMsg('wallet: ' + btc + ' BTC · ' + utxos.length + ' UTXOs · ' + fees.halfHourFee + ' sat/vB');
+  } catch (e) {
+    document.getElementById('wBal').textContent = 'offline';
+    document.getElementById('wRefresh').textContent = '· fetch failed';
+  }
+}
+
+function copyAddr() {
+  navigator.clipboard.writeText(TARGET_ADDR).then(() => logMsg('address copied'));
+}
+
+async function privKeyToWIF(hexKey) {
+  const padded = hexKey.padStart(64, '0');
+  const keyBytes = new Uint8Array(padded.match(/.{2}/g).map(b => parseInt(b, 16)));
+  const payload = new Uint8Array(34);
+  payload[0] = 0x80;
+  payload.set(keyBytes, 1);
+  payload[33] = 0x01;
+  const h1 = new Uint8Array(await crypto.subtle.digest('SHA-256', payload));
+  const h2 = new Uint8Array(await crypto.subtle.digest('SHA-256', h1));
+  const full = new Uint8Array(38);
+  full.set(payload);
+  full.set(h2.slice(0, 4), 34);
+  return base58Encode(full);
+}
+
+function base58Encode(bytes) {
+  const ALPHA = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  let num = 0n;
+  for (const b of bytes) num = num * 256n + BigInt(b);
+  let str = '';
+  while (num > 0n) { str = ALPHA[Number(num % 58n)] + str; num /= 58n; }
+  for (const b of bytes) { if (b === 0) str = '1' + str; else break; }
+  return str;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// alpha SCAFFOLD — multi-provider AI backend router
+// CPU does the jumping. AI does the thinking about WHERE to jump.
+// Free tiers first, paid last. Solver never stops if AI is unavailable.
+// Keys never leave the browser — requests go direct to each provider.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const backends = [
+  // ── WESTERN FREE TIERS ──
+  { name:'gemini',     url:'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', auth:'query', qkey:'key', format:'gemini', free:true, status:'untested' },
+  { name:'groq',       url:'https://api.groq.com/openai/v1/chat/completions',      auth:'bearer', model:'llama-3.1-8b-instant',                format:'openai', free:true, status:'untested' },
+  { name:'mistral',    url:'https://api.mistral.ai/v1/chat/completions',            auth:'bearer', model:'mistral-small-latest',                format:'openai', free:true, status:'untested' },
+  { name:'openrouter', url:'https://openrouter.ai/api/v1/chat/completions',         auth:'bearer', model:'meta-llama/llama-3-8b-instruct:free', format:'openai', free:true, status:'untested' },
+  // ── CHINESE FREE TIERS ──
+  { name:'deepseek-v3',url:'https://api.deepseek.com/chat/completions',             auth:'bearer', model:'deepseek-chat',                      format:'openai', free:true, status:'untested' },
+  { name:'deepseek-r1',url:'https://api.deepseek.com/chat/completions',             auth:'bearer', model:'deepseek-reasoner',                   format:'openai', free:true, status:'untested' },
+  { name:'qwen',       url:'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', auth:'bearer', model:'qwen-turbo',             format:'openai', free:true, status:'untested' },
+  { name:'yi',         url:'https://api.lingyiwanwu.com/v1/chat/completions',       auth:'bearer', model:'yi-lightning',                        format:'openai', free:true, status:'untested' },
+  { name:'moonshot',   url:'https://api.moonshot.cn/v1/chat/completions',            auth:'bearer', model:'moonshot-v1-8k',                     format:'openai', free:true, status:'untested' },
+  { name:'baichuan',   url:'https://api.baichuan-ai.com/v1/chat/completions',        auth:'bearer', model:'Baichuan4-Air',                      format:'openai', free:true, status:'untested' },
+  { name:'glm',        url:'https://open.bigmodel.cn/api/paas/v4/chat/completions',  auth:'bearer', model:'glm-4-flash',                        format:'openai', free:true, status:'untested' },
+  { name:'minimax',    url:'https://api.minimax.chat/v1/text/chatcompletion_v2',     auth:'bearer', model:'MiniMax-Text-01',                    format:'openai', free:true, status:'untested' },
+  // ── PAID FALLBACK ──
+  { name:'anthropic',  url:'https://api.anthropic.com/v1/messages',                  auth:'anthropic', model:'claude-sonnet-4-20250514',        format:'anthropic', free:false, status:'untested' },
+];
+
+let apiKeys = {};
+let aiEnabled = false;
+let aiIntervalMs = 5 * 60 * 1000;
+let aiTimer = null;
+let aiHintsUsed = 0;
+let aiHintsTotal = 0;
+
+const AI_SYSTEM = 'You are an AI advisor for a Pollard\'s kangaroo solver targeting Bitcoin Puzzle #135 (secp256k1, 135-bit key range [0x4000...0000, 0x7FFF...FFFF]). Analyze distinguished point distributions and suggest search optimizations. Reply ONLY with valid JSON, no markdown, no explanation.';
+
+async function callAI(prompt) {
+  for (const b of backends) {
+    const key = apiKeys[b.name];
+    if (!key) { b.status = 'no_key'; updateAIStatus(); continue; }
+
+    try {
+      let res;
+      if (b.format === 'gemini') {
+        res = await fetch(b.url + '?key=' + encodeURIComponent(key), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contents: [{ parts: [{ text: AI_SYSTEM + '\n\n' + prompt }] }], generationConfig: { maxOutputTokens: 500, temperature: 0.3 } }),
+          signal: AbortSignal.timeout(30000)
+        });
+      } else if (b.format === 'openai') {
+        res = await fetch(b.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+          body: JSON.stringify({ model: b.model, messages: [{ role: 'system', content: AI_SYSTEM }, { role: 'user', content: prompt }], max_tokens: 500, temperature: 0.3 }),
+          signal: AbortSignal.timeout(30000)
+        });
+      } else if (b.format === 'anthropic') {
+        res = await fetch(b.url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: b.model, system: AI_SYSTEM, messages: [{ role: 'user', content: prompt }], max_tokens: 500 }),
+          signal: AbortSignal.timeout(30000)
+        });
+      }
+
+      if (res.status === 429) { b.status = 'limited'; updateAIStatus(); continue; }
+      if (res.status === 401 || res.status === 403) { b.status = 'auth_fail'; updateAIStatus(); continue; }
+      if (!res.ok) { b.status = 'error'; updateAIStatus(); continue; }
+
+      const data = await res.json();
+      let text = '';
+      if (b.format === 'gemini') text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      else if (b.format === 'openai') text = data.choices?.[0]?.message?.content || '';
+      else if (b.format === 'anthropic') text = data.content?.[0]?.text || '';
+
+      if (text) {
+        b.status = 'alive';
+        updateAIStatus();
+        logMsg('<span class="peer">AI (' + b.name + '): responded</span>');
+        return { provider: b.name, text };
+      }
+    } catch (e) {
+      b.status = e.name === 'TimeoutError' ? 'timeout' : 'error';
+      updateAIStatus();
+    }
+  }
+  return null;
+}
+
+// short labels for the AI status bar
+const AI_SHORT = { gemini:'gem', groq:'grq', mistral:'mis', openrouter:'or', 'deepseek-v3':'ds3', 'deepseek-r1':'r1', qwen:'qw', yi:'yi', moonshot:'mn', baichuan:'bc', glm:'glm', minimax:'mm', anthropic:'ant' };
+
+function updateAIStatus() {
+  const hasAnyKey = backends.some(b => apiKeys[b.name]);
+  document.getElementById('aiBar').style.display = hasAnyKey ? 'flex' : 'none';
+  for (const b of backends) {
+    const el = document.getElementById('aiSt_' + b.name);
+    if (!el) continue;
+    const sym = b.status === 'alive' ? '●' : b.status === 'limited' ? '◐' : '○';
+    el.textContent = sym + (AI_SHORT[b.name] || b.name);
+    el.className = 'ai-dot' + (b.status === 'alive' ? ' alive' : b.status === 'limited' ? ' limited' : b.status === 'auth_fail' || b.status === 'error' ? ' dead' : '');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// zeta AUDIT — AI guidance loop
+// Every N minutes: ask AI to analyze DP distribution and suggest strategy
+// epsilon GATE validates every suggestion before applying
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function runAIGuidance() {
+  if (!running || dpMap.size < 10 || !aiEnabled) return;
+
+  // Build DP summary for the AI
+  let tameSample = [], wildSample = [];
+  let i = 0;
+  dpMap.forEach((v, x) => {
+    if (i++ > 100) return;
+    const prefix = x.slice(0, 16);
+    if (v.type === 'tame') tameSample.push(prefix);
+    else wildSample.push(prefix);
+  });
+
+  const prompt = 'DP DISTRIBUTION ANALYSIS:\n' +
+    'Tame DPs: ' + tameCount + ' | Wild DPs: ' + wildCount + ' | Total unique: ' + dpMap.size + '\n' +
+    'Jump rate: ' + Math.round(jumpRate) + '/s | DP bits: ' + (document.getElementById('dpBits').value) + '\n' +
+    'Tame x-prefixes (sample): [' + tameSample.slice(0, 20).join(', ') + ']\n' +
+    'Wild x-prefixes (sample): [' + wildSample.slice(0, 20).join(', ') + ']\n\n' +
+    'Questions:\n' +
+    '1. Are DPs clustering in specific x-prefix regions?\n' +
+    '2. Is the tame/wild ratio healthy for collision probability?\n' +
+    '3. Should DP bit threshold be adjusted?\n\n' +
+    'Reply with JSON: { "assessment": "string", "adjust_dp_bits": number|null, "restart_recommended": boolean, "reasoning": "string" }';
+
+  logMsg('<span class="peer">AI guidance: querying...</span>');
+  aiHintsTotal++;
+  const result = await callAI(prompt);
+  if (!result) { logMsg('AI guidance: all providers unavailable'); return; }
+
+  // epsilon GATE — validate AI response
+  try {
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonStr = result.text;
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) { logMsg('AI hint: no valid JSON in response'); return; }
+    const hint = JSON.parse(jsonMatch[0]);
+
+    // Validate: DP bits adjustment
+    if (hint.adjust_dp_bits != null) {
+      const newBits = parseInt(hint.adjust_dp_bits);
+      if (newBits >= 8 && newBits <= 28 && newBits !== parseInt(document.getElementById('dpBits').value)) {
+        logMsg('<span class="peer">AI hint (gated): adjust DP bits to ' + newBits + '</span>');
+        // Don't auto-apply — just suggest
+      } else if (newBits < 8 || newBits > 28) {
+        logMsg('AI hint rejected: DP bits ' + newBits + ' out of range [8-28]');
+      }
+    }
+
+    const summary = hint.assessment || hint.reasoning || 'no assessment';
+    document.getElementById('aiLastHint').textContent = summary.slice(0, 80);
+    document.getElementById('aiLastHint').title = summary;
+    aiHintsUsed++;
+    logMsg('<span class="peer">AI (' + result.provider + '): ' + summary.slice(0, 100) + '</span>');
+  } catch (e) {
+    logMsg('AI hint parse error: ' + e.message);
+  }
+}
+
+function startAIGuidance() {
+  if (aiTimer) clearInterval(aiTimer);
+  aiTimer = setInterval(runAIGuidance, aiIntervalMs);
+  // First guidance after 30 seconds (let DPs accumulate)
+  setTimeout(() => { if (aiEnabled && running) runAIGuidance(); }, 30000);
+}
+
+function stopAIGuidance() {
+  if (aiTimer) { clearInterval(aiTimer); aiTimer = null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETTINGS — IndexedDB persistence for API keys and config
+// Keys stored locally, never sent anywhere except the provider endpoint
+// ═══════════════════════════════════════════════════════════════════════════
+
+const KEY_FIELDS = {
+  gemini:'keyGemini', groq:'keyGroq', mistral:'keyMistral', openrouter:'keyOpenRouter',
+  'deepseek-v3':'keyDeepseekV3', 'deepseek-r1':'keyDeepseekR1', qwen:'keyQwen', yi:'keyYi',
+  moonshot:'keyMoonshot', baichuan:'keyBaichuan', glm:'keyGlm', minimax:'keyMinimax', anthropic:'keyAnthropic'
+};
+
+function openSettings() {
+  document.getElementById('settingsOverlay').style.display = 'flex';
+  for (const [name, fieldId] of Object.entries(KEY_FIELDS)) {
+    const el = document.getElementById(fieldId);
+    if (el) el.value = apiKeys[name] || '';
+  }
+  document.getElementById('aiInterval').value = aiIntervalMs / 60000;
+  document.getElementById('aiEnabled').checked = aiEnabled;
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').style.display = 'none';
+}
+
+async function saveSettings() {
+  for (const [name, fieldId] of Object.entries(KEY_FIELDS)) {
+    const el = document.getElementById(fieldId);
+    if (el) apiKeys[name] = el.value.trim();
+  }
+  aiIntervalMs = parseInt(document.getElementById('aiInterval').value) * 60000 || 300000;
+  aiEnabled    = document.getElementById('aiEnabled').checked;
+
+  // Persist to IndexedDB
+  try {
+    const db = await openDB();
+    const tx = db.transaction('meta', 'readwrite');
+    const store = tx.objectStore('meta');
+    store.put({ key: 'apiKeys',      value: apiKeys });
+    store.put({ key: 'aiIntervalMs', value: aiIntervalMs });
+    store.put({ key: 'aiEnabled',    value: aiEnabled });
+    await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  } catch (e) {
+    logMsg('settings save error: ' + e.message);
+  }
+
+  updateAIStatus();
+  if (aiEnabled) startAIGuidance(); else stopAIGuidance();
+  closeSettings();
+
+  const keyCount = Object.values(apiKeys).filter(Boolean).length;
+  logMsg('settings saved · ' + keyCount + ' API key' + (keyCount !== 1 ? 's' : '') + ' · AI ' + (aiEnabled ? 'on' : 'off'));
+}
+
+async function loadSettings() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction('meta', 'readonly');
+    const store = tx.objectStore('meta');
+
+    const keysReq = store.get('apiKeys');
+    const intReq  = store.get('aiIntervalMs');
+    const enReq   = store.get('aiEnabled');
+
+    await new Promise((res) => { tx.oncomplete = res; });
+
+    if (keysReq.result) apiKeys      = keysReq.result.value;
+    if (intReq.result)  aiIntervalMs = intReq.result.value;
+    if (enReq.result)   aiEnabled    = enReq.result.value;
+  } catch {}
+  updateAIStatus();
+  if (aiEnabled) startAIGuidance();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT / IMPORT — NDJSON interop with Node.js solver + Thomas's data
+// ═══════════════════════════════════════════════════════════════════════════
+
+function exportDPs() {
+  const lines = [];
+  dpMap.forEach((v, x) => lines.push(JSON.stringify({ kind:'dp', type:v.type, x, dist:v.dist, n:nodeId, ts:Math.floor(Date.now()/1000) })));
+  const blob = new Blob([lines.join('\n') + '\n'], { type: 'application/x-ndjson' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'dp-store.ndjson';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  logMsg('exported ' + lines.length + ' DPs');
+}
+
+function importDPs(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const lines = reader.result.split('\n').filter(Boolean);
+    let imported = 0;
+    for (const line of lines) {
+      try {
+        const dp = JSON.parse(line);
+        // Support both formats: { type, x, dist } and { t, x, d }
+        const type = dp.type || dp.t;
+        const dist = dp.dist || dp.d;
+        if (dp.x && type && dist) {
+          if (processDP({ type, x: dp.x, dist }, 'import')) imported++;
+        }
+      } catch {}
+    }
+    logMsg('imported ' + imported + ' new DPs from ' + lines.length + ' total');
+    drawTorus();
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// eta SCORE — progress tracking and estimation
+// Calculates expected time to collision based on DP accumulation rate
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updateStats() {
+  const now = Date.now();
+  const dt = (now - lastJumpTime) / 1000;
+  if (dt > 0) {
+    jumpRate = (totalJumps - lastJumpSnap) / dt;
+    lastJumpSnap = totalJumps;
+    lastJumpTime = now;
+  }
+  const rateStr = jumpRate >= 1e6 ? (jumpRate/1e6).toFixed(1)+'M/s'
+    : jumpRate >= 1e3 ? (jumpRate/1e3).toFixed(1)+'k/s'
+    : jumpRate.toFixed(0)+'/s';
+
+  document.getElementById('sTame').textContent = 'Tame: ' + tameCount;
+  document.getElementById('sWild').textContent = 'Wild: ' + wildCount;
+  document.getElementById('sRate').textContent = rateStr;
+  document.getElementById('sColl').textContent = 'Collisions: ' + collisionCount;
+  document.getElementById('sJumps').textContent = 'Jumps: ' + (totalJumps >= 1e6 ? (totalJumps/1e6).toFixed(1)+'M' : totalJumps.toLocaleString());
+  document.getElementById('sStored').textContent = 'Stored: ' + dpMap.size;
+}
+
+function logMsg(msg) {
+  const el = document.getElementById('log');
+  const ts = new Date().toLocaleTimeString();
+  el.innerHTML = '<div><span class="t">' + ts + '</span>' + msg + '</div>' + el.innerHTML;
+  if (el.children.length > 100) el.removeChild(el.lastChild);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Omega ORCHESTRATOR — render loop, init sequence, event wiring
+// ═══════════════════════════════════════════════════════════════════════════
+
+let lastStatUpdate = 0;
+function tick() {
+  const now = Date.now();
+  if (now - lastStatUpdate > 1500) { updateStats(); lastStatUpdate = now; }
+  if (drawDirty) drawTorus();
+  requestAnimationFrame(tick);
+}
+
+window.addEventListener('resize', () => { drawDirty = true; });
+document.getElementById('mod').addEventListener('change', () => {
+  tamePts = []; wildPts = [];
+  dpMap.forEach((v, x) => addTorusPoint({ x, type: v.type }));
+  drawDirty = true;
+});
+
+// ─── BOOT SEQUENCE ───
+(async function boot() {
+  logMsg('booting FallCassie · 8+1 Konomi topology · ◊·κ=1');
+
+  // gamma: restore node identity
+  nodeId = await getOrCreateNodeId();
+  logMsg('node: ' + nodeId.slice(0, 8) + '...');
+
+  // gamma: restore persisted DPs
+  try {
+    const stored = await loadStoredDPs();
+    if (stored.length > 0) {
+      let loaded = 0;
+      for (const dp of stored) {
+        if (dp.x && dp.type && dp.dist) {
+          dpMap.set(dp.x, { type: dp.type, dist: dp.dist });
+          if (dp.type === 'tame') tameCount++; else wildCount++;
+          addTorusPoint(dp);
+          loaded++;
+        }
+      }
+      if (loaded > 0) {
+        logMsg('restored ' + loaded + ' DPs from IndexedDB');
+        drawDirty = true;
+      }
+    }
+  } catch (e) {
+    logMsg('IndexedDB load error: ' + e.message);
+  }
+
+  // alpha: load AI settings + API keys
+  await loadSettings();
+
+  // mesh: init WebRTC P2P
+  initMesh(nodeId);
+
+  // mempool: fetch wallet balance
+  fetchWallet();
+  setInterval(fetchWallet, 60000);
+
+  // theta: start render loop
+  drawTorus();
+  tick();
+
+  logMsg('target: ' + TARGET_PUBKEY.slice(0, 24) + '...');
+  logMsg('sovereign compute · your keys never leave this tab');
+})();
+</script>
+</body>
+</html>

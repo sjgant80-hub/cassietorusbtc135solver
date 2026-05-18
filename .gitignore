@@ -1,0 +1,8 @@
+node_modules/
+*.log
+*.ndjson
+checkpoint-*.json
+cassie-checkpoint.json
+puzzle-analysis.json
+exports/
+imports/

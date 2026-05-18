@@ -1,0 +1,1464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CASSIE TORUS — WebGPU Kangaroo Solver v2</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b0a0f;color:#c4bfb2;font-family:'IBM Plex Mono',monospace;padding:20px;min-height:100vh}
+h1{color:#b8974a;font-size:1.4em;margin-bottom:4px}
+h2{color:#b8974a;font-size:1em;margin:16px 0 8px;border-bottom:1px solid #222}
+.subtitle{color:#666;font-size:0.85em;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:#111;border:1px solid #222;border-radius:6px;padding:12px}
+.card.wide{grid-column:1/-1}
+.stat-row{display:flex;justify-content:space-between;margin:4px 0;font-size:0.9em}
+.stat-label{color:#888}
+.stat-val{color:#c4bfb2;font-weight:bold}
+.stat-val.good{color:#4a4}
+.stat-val.hot{color:#b8974a}
+.stat-val.warn{color:#a44}
+.stat-val.primary{color:#ff6644}
+.stat-val.scout{color:#44aaff}
+.stat-val.sniper{color:#44ff88}
+#console{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:10px;
+  height:300px;overflow-y:auto;font-size:0.8em;line-height:1.5;white-space:pre-wrap}
+.btn{background:#222;color:#b8974a;border:1px solid #b8974a;padding:8px 20px;
+  border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.9em;margin:4px}
+.btn:hover{background:#b8974a;color:#0b0a0f}
+.btn:disabled{opacity:0.3;cursor:not-allowed}
+.btn.primary{background:#8b1a1a;border-color:#8b1a1a;color:#c4bfb2}
+.btn.primary:hover{background:#a02020}
+.controls{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;align-items:center}
+.controls label{color:#888;font-size:0.85em;display:flex;align-items:center;gap:6px}
+.controls input[type=number],.controls input[type=text]{
+  background:#111;color:#c4bfb2;border:1px solid #333;padding:4px;font-family:inherit}
+.controls input[type=range]{width:100px;accent-color:#b8974a}
+#error{color:#f44;padding:10px;display:none;border:1px solid #f44;border-radius:6px;margin:12px 0}
+</style>
+</head>
+<body>
+
+<h1>◊·κ=1 CASSIE TORUS — WebGPU Kangaroo Solver v2</h1>
+<p class="subtitle">Recursive spine {2,3,5,11,31,127,709} · Triad topology · secp256k1 Montgomery | Puzzle #135</p>
+
+<div id="error"></div>
+
+<div class="controls">
+  <button class="btn primary" id="btnStart" disabled>Initializing GPU...</button>
+  <button class="btn" id="btnStop" disabled>Stop</button>
+  <button class="btn" id="btnExport" disabled>Export DPs</button>
+  <button class="btn" id="btnImport" disabled>Import DPs</button>
+  <button class="btn" id="btnMerge" disabled>Merge Check</button>
+  <label>Walkers: <input id="numWalkers" type="number" value="4096" min="64" max="65536" step="64"
+    style="width:80px"></label>
+</div>
+
+<div class="controls">
+  <label>Ψ bias: <input id="psiBias" type="range" min="0" max="100" value="70">
+    <span id="psiBiasVal" style="min-width:40px">0.70</span></label>
+  <label>BTC addr: <input id="btcAddr" type="text" placeholder="your BTC address for split"
+    style="width:260px;font-size:0.85em"></label>
+  <label>Room: <input id="roomCode" type="text" placeholder="room code"
+    style="width:100px;font-size:0.85em;text-transform:uppercase"></label>
+  <button class="btn" id="btnCreate">Create Room</button>
+  <button class="btn" id="btnJoin">Join</button>
+  <button class="btn" id="btnLeave" disabled>Leave</button>
+  <span id="meshStatus" style="color:#666;font-size:0.8em">Offline</span>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>GPU</h2>
+    <div class="stat-row"><span class="stat-label">Device</span><span class="stat-val" id="gpuName">-</span></div>
+    <div class="stat-row"><span class="stat-label">Status</span><span class="stat-val" id="gpuStatus">Checking...</span></div>
+    <div class="stat-row"><span class="stat-label">Walkers</span><span class="stat-val" id="walkerCount">-</span></div>
+  </div>
+  <div class="card">
+    <h2>Performance</h2>
+    <div class="stat-row"><span class="stat-label">EC ops/sec</span><span class="stat-val hot" id="opsRate">-</span></div>
+    <div class="stat-row"><span class="stat-label">Total ops</span><span class="stat-val" id="totalOps">0</span></div>
+    <div class="stat-row"><span class="stat-label">Dispatches</span><span class="stat-val" id="dispatches">0</span></div>
+  </div>
+  <div class="card">
+    <h2>Triad Structure</h2>
+    <div class="stat-row"><span class="stat-label">Primary (macro)</span><span class="stat-val primary" id="primaryCount">-</span></div>
+    <div class="stat-row"><span class="stat-label">Scout (meso)</span><span class="stat-val scout" id="scoutCount">-</span></div>
+    <div class="stat-row"><span class="stat-label">Sniper (micro)</span><span class="stat-val sniper" id="sniperCount">-</span></div>
+  </div>
+  <div class="card">
+    <h2>Distinguished Points</h2>
+    <div class="stat-row"><span class="stat-label">Coarse (22-bit)</span><span class="stat-val" id="coarseDPs">0</span></div>
+    <div class="stat-row"><span class="stat-label">Medium (18-bit)</span><span class="stat-val" id="mediumDPs">0</span></div>
+    <div class="stat-row"><span class="stat-label">Fine (14-bit)</span><span class="stat-val" id="fineDPs">0</span></div>
+    <div class="stat-row"><span class="stat-label">Tame / Wild</span><span class="stat-val" id="twRatio">- / -</span></div>
+  </div>
+  <div class="card">
+    <h2>Collision Status</h2>
+    <div class="stat-row"><span class="stat-label">Cross-type</span><span class="stat-val good" id="collisions">0</span></div>
+    <div class="stat-row"><span class="stat-label">Torus fold hits</span><span class="stat-val" id="torusFoldHits">0</span></div>
+    <div class="stat-row"><span class="stat-label">Dup trajectory</span><span class="stat-val" id="dupTraj">0</span></div>
+    <div class="stat-row"><span class="stat-label">Elapsed</span><span class="stat-val" id="elapsed">-</span></div>
+  </div>
+  <div class="card">
+    <h2>WebRTC Mesh</h2>
+    <div class="stat-row"><span class="stat-label">Peers</span><span class="stat-val good" id="meshPeers">0</span></div>
+    <div class="stat-row"><span class="stat-label">DPs sent</span><span class="stat-val" id="meshSent">0</span></div>
+    <div class="stat-row"><span class="stat-label">DPs received</span><span class="stat-val" id="meshRecv">0</span></div>
+    <div class="stat-row"><span class="stat-label">Room</span><span class="stat-val hot" id="meshRoom">-</span></div>
+  </div>
+  <div class="card wide">
+    <h2>Contribution Ledger — 13.5 BTC split</h2>
+    <div id="ledgerTable" style="font-size:0.85em;max-height:150px;overflow-y:auto">
+      <div class="stat-row"><span class="stat-label">No peers connected</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card wide" style="margin-bottom:16px">
+  <h2>Console</h2>
+  <div id="console"></div>
+</div>
+
+<script type="module">
+// ═══════════════════════════════════════════════════
+// ◊·κ=1 CONSTANTS — TORUS TOPOLOGY
+// ═══════════════════════════════════════════════════
+const P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn;
+const N_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+const Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n;
+const Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n;
+const TARGET_PUBKEY_HEX = '02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16';
+const TARGET_X = 0x145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16n;
+const RANGE_LOW  = 0x4000000000000000000000000000000000n;
+const RANGE_HIGH = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn;
+const RANGE_SIZE = RANGE_HIGH - RANGE_LOW + 1n;
+const RANGE_BITS = 134;
+
+// Montgomery
+const R = 1n << 256n;
+const R_MOD_P = R % P;
+const R2_MOD_P = (R * R) % P;
+
+// Torus constants
+const PHI = 1.6180339887498948;
+const KAPPA = 0.6180339887498948;
+const FOLD = 510510n;
+const THETA_HOME = 37;
+const MULBERRY_K = 0x9E3779B9;
+
+// Triad spine subsets
+const SNIPER_SPINE  = [2, 3, 5];
+const SCOUT_SPINE   = [5, 11, 31];
+const PRIMARY_SPINE = [31, 127, 709];
+
+// Solver params
+const STEPS_PER_DISPATCH = 64;
+const WALK_RESTART_STEPS = 1 << 22;
+const DISPATCHES_PER_BATCH = 8;
+
+// ═══════════════════════════════════════════════════
+// MULBERRY32 — κ in silicon
+// ═══════════════════════════════════════════════════
+function mulberry32(seed) {
+  return function() {
+    seed = (seed + 0x9E3779B9) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (t ^ (t >>> 14)) >>> 0;
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// EC MATH (CPU-side, init only)
+// ═══════════════════════════════════════════════════
+function mod(a, m) { const r = a % m; return r < 0n ? r + m : r; }
+
+function modPow(base, exp, m) {
+  let result = 1n; base = mod(base, m);
+  while (exp > 0n) {
+    if (exp & 1n) result = mod(result * base, m);
+    exp >>= 1n; base = mod(base * base, m);
+  }
+  return result;
+}
+
+function modInv(a, m) { return modPow(a, m - 2n, m); }
+
+function jacDouble(jp) {
+  if (!jp) return null;
+  const [X, Y, Z] = jp;
+  if (Y === 0n) return null;
+  const YY = mod(Y * Y, P);
+  const S = mod(4n * X * YY, P);
+  const M = mod(3n * X * X, P);
+  const X3 = mod(M * M - 2n * S, P);
+  const Y3 = mod(M * (S - X3) - 8n * YY * YY, P);
+  const Z3 = mod(2n * Y * Z, P);
+  return [X3, Y3, Z3];
+}
+
+function jacAdd(p1, p2) {
+  if (!p1) return p2; if (!p2) return p1;
+  const [X1, Y1, Z1] = p1; const [X2, Y2, Z2] = p2;
+  const Z1sq = mod(Z1 * Z1, P); const Z2sq = mod(Z2 * Z2, P);
+  const U1 = mod(X1 * Z2sq, P); const U2 = mod(X2 * Z1sq, P);
+  const S1 = mod(Y1 * mod(Z2sq * Z2, P), P);
+  const S2 = mod(Y2 * mod(Z1sq * Z1, P), P);
+  const H = mod(U2 - U1, P); const Rv = mod(S2 - S1, P);
+  if (H === 0n) { return Rv === 0n ? jacDouble(p1) : null; }
+  const HH = mod(H * H, P); const HHH = mod(H * HH, P);
+  const X3 = mod(Rv * Rv - HHH - 2n * U1 * HH, P);
+  const Y3 = mod(Rv * mod(U1 * HH - X3, P) - S1 * HHH, P);
+  const Z3 = mod(Z1 * Z2 * H, P);
+  return [X3, Y3, Z3];
+}
+
+function jacToAffine(jp) {
+  if (!jp) return null;
+  const [X, Y, Z] = jp;
+  const Zi = modInv(Z, P); const Zi2 = mod(Zi * Zi, P); const Zi3 = mod(Zi2 * Zi, P);
+  return [mod(X * Zi2, P), mod(Y * Zi3, P)];
+}
+
+function ecMulFast(point, scalar) {
+  let result = null; let base = [point[0], point[1], 1n];
+  scalar = mod(scalar, N_ORDER);
+  while (scalar > 0n) {
+    if (scalar & 1n) { if (!result) result = [base[0], base[1], base[2]]; else result = jacAdd(result, base); }
+    base = jacDouble(base); scalar >>= 1n;
+  }
+  return jacToAffine(result);
+}
+
+function ecAddFast(p1, p2) {
+  return jacToAffine(jacAdd([p1[0], p1[1], 1n], [p2[0], p2[1], 1n]));
+}
+
+function decompressPoint(hex) {
+  const prefix = parseInt(hex.slice(0, 2), 16);
+  const x = BigInt('0x' + hex.slice(2));
+  const ySquared = mod(x * x * x + 7n, P);
+  let y = modPow(ySquared, (P + 1n) / 4n, P);
+  if ((y & 1n) !== BigInt(prefix & 1)) y = P - y;
+  return [x, y];
+}
+
+// ═══════════════════════════════════════════════════
+// LIMB CONVERSION
+// ═══════════════════════════════════════════════════
+function bigintToLimbs(v) {
+  const limbs = new Uint32Array(8); v = mod(v, P);
+  for (let i = 0; i < 8; i++) { limbs[i] = Number(v & 0xFFFFFFFFn); v >>= 32n; }
+  return limbs;
+}
+
+function limbsToHex(limbs) {
+  let hex = '';
+  for (let i = 7; i >= 0; i--) hex += limbs[i].toString(16).padStart(8, '0');
+  return hex;
+}
+
+function toMont(v) { return mod(v * R, P); }
+function toMontLimbs(v) { return bigintToLimbs(toMont(v)); }
+
+function computeN0() {
+  let p0 = 0xFFFFFC2Fn; let inv = 1n;
+  for (let i = 0; i < 6; i++) inv = (inv * (2n - p0 * inv)) & 0xFFFFFFFFn;
+  return Number((-inv) & 0xFFFFFFFFn);
+}
+const N0 = computeN0();
+
+// ═══════════════════════════════════════════════════
+// CONSOLE
+// ═══════════════════════════════════════════════════
+const conEl = document.getElementById('console');
+function log(msg) {
+  const ts = new Date().toISOString().slice(11, 19);
+  conEl.textContent += `[${ts}] ${msg}\n`;
+  conEl.scrollTop = conEl.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════
+// WGSL SHADER — TORUS TOPOLOGY + TRIADS
+// ═══════════════════════════════════════════════════
+const SHADER_SOURCE = `
+alias U256 = array<u32, 8>;
+struct JacPoint { x: U256, y: U256, z: U256, }
+struct WalkState {
+  jx: U256, jy: U256, jz: U256, dist: U256,
+  walk_type: u32, step_count: u32, dp_count: u32,
+  flags: u32,  // bit0=restart, bits1-2=triad(0=primary,1=scout,2=sniper)
+}
+struct JumpEntry { ax: U256, ay: U256, d: U256, }
+struct DPResult { x: U256, dist: U256, walk_type: u32, walk_id: u32, level: u32, pad: u32, }
+struct Params { num_walks: u32, steps_per_dispatch: u32, dp_check_interval: u32, max_dp_results: u32, n0: u32, pad1: u32, pad2: u32, pad3: u32, }
+
+@group(0) @binding(0) var<storage, read_write> walks: array<WalkState>;
+@group(0) @binding(1) var<storage, read> jumps: array<JumpEntry, 9>;
+@group(0) @binding(2) var<storage, read_write> dp_results: array<DPResult>;
+@group(0) @binding(3) var<storage, read_write> dp_counter: array<atomic<u32>, 1>;
+@group(0) @binding(4) var<uniform> params: Params;
+
+const FP0: u32 = 0xFFFFFC2Fu; const FP1: u32 = 0xFFFFFFFEu;
+const FP2: u32 = 0xFFFFFFFFu; const FP3: u32 = 0xFFFFFFFFu;
+const FP4: u32 = 0xFFFFFFFFu; const FP5: u32 = 0xFFFFFFFFu;
+const FP6: u32 = 0xFFFFFFFFu; const FP7: u32 = 0xFFFFFFFFu;
+fn fp() -> U256 { return U256(FP0, FP1, FP2, FP3, FP4, FP5, FP6, FP7); }
+
+fn wmul(a: u32, b: u32) -> vec2<u32> {
+  let al = a & 0xFFFFu; let ah = a >> 16u;
+  let bl = b & 0xFFFFu; let bh = b >> 16u;
+  let ll = al * bl; let lh = al * bh; let hl = ah * bl; let hh = ah * bh;
+  let mid = lh + hl; let mid_c = select(0u, 1u, mid < lh);
+  let lo = ll + (mid << 16u); let lo_c = select(0u, 1u, lo < ll);
+  let hi = hh + (mid >> 16u) + (mid_c << 16u) + lo_c;
+  return vec2<u32>(lo, hi);
+}
+
+fn u256_gte(a: U256, b: U256) -> bool {
+  if (a[7] != b[7]) { return a[7] > b[7]; } if (a[6] != b[6]) { return a[6] > b[6]; }
+  if (a[5] != b[5]) { return a[5] > b[5]; } if (a[4] != b[4]) { return a[4] > b[4]; }
+  if (a[3] != b[3]) { return a[3] > b[3]; } if (a[2] != b[2]) { return a[2] > b[2]; }
+  if (a[1] != b[1]) { return a[1] > b[1]; } return a[0] >= b[0];
+}
+
+fn u256_sub(a: U256, b: U256) -> U256 {
+  var r: U256; var borrow: u32 = 0u;
+  for (var i = 0u; i < 8u; i++) {
+    let bi = b[i] + borrow; let bi_c = select(0u, 1u, bi < borrow);
+    let d = a[i] - bi; let d_c = select(0u, 1u, a[i] < bi);
+    r[i] = d; borrow = bi_c | d_c;
+  }
+  return r;
+}
+
+fn field_add(a: U256, b: U256) -> U256 {
+  var r: U256; var carry: u32 = 0u;
+  for (var i = 0u; i < 8u; i++) {
+    let s1 = a[i] + b[i]; let c1 = select(0u, 1u, s1 < a[i]);
+    let s2 = s1 + carry; let c2 = select(0u, 1u, s2 < s1);
+    r[i] = s2; carry = c1 + c2;
+  }
+  let p = fp();
+  if (carry > 0u || u256_gte(r, p)) { r = u256_sub(r, p); }
+  return r;
+}
+
+fn field_sub(a: U256, b: U256) -> U256 {
+  if (u256_gte(a, b)) { return u256_sub(a, b); }
+  return u256_sub(fp(), u256_sub(b, a));
+}
+
+fn field_dbl(a: U256) -> U256 { return field_add(a, a); }
+
+fn mont_mul(a: U256, b: U256) -> U256 {
+  var t: array<u32, 10>;
+  for (var k = 0u; k < 10u; k++) { t[k] = 0u; }
+  let n0 = params.n0; let p = fp();
+  for (var i = 0u; i < 8u; i++) {
+    let ai = a[i]; var C: u32 = 0u;
+    for (var j = 0u; j < 8u; j++) {
+      let uv = wmul(ai, b[j]);
+      let s1 = t[j] + uv.x; let c1 = select(0u, 1u, s1 < t[j]);
+      let s2 = s1 + C; let c2 = select(0u, 1u, s2 < s1);
+      t[j] = s2; C = uv.y + c1 + c2;
+    }
+    let s8a = t[8] + C; let c8a = select(0u, 1u, s8a < t[8]);
+    t[8] = s8a; t[9] = t[9] + c8a;
+    let m = t[0] * n0;
+    let uv0 = wmul(m, p[0]);
+    let s0 = t[0] + uv0.x;
+    C = uv0.y + select(0u, 1u, s0 < t[0]);
+    for (var j = 1u; j < 8u; j++) {
+      let uv = wmul(m, p[j]);
+      let s1 = t[j] + uv.x; let c1 = select(0u, 1u, s1 < t[j]);
+      let s2 = s1 + C; let c2 = select(0u, 1u, s2 < s1);
+      t[j - 1u] = s2; C = uv.y + c1 + c2;
+    }
+    let s7 = t[8] + C; let c7 = select(0u, 1u, s7 < t[8]);
+    t[7] = s7; t[8] = t[9] + c7; t[9] = 0u;
+  }
+  var result: U256;
+  for (var k = 0u; k < 8u; k++) { result[k] = t[k]; }
+  if (t[8] > 0u || u256_gte(result, p)) { result = u256_sub(result, p); }
+  return result;
+}
+
+fn mont_sqr(a: U256) -> U256 { return mont_mul(a, a); }
+fn from_mont(a: U256) -> U256 { return mont_mul(a, U256(1u,0u,0u,0u,0u,0u,0u,0u)); }
+
+fn field_inv(a: U256) -> U256 {
+  let x1 = a;
+  let x2 = mont_mul(mont_sqr(a), a);
+  let x3 = mont_mul(mont_sqr(x2), x1);
+  var t = x3; t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  let x6 = mont_mul(t, x3);
+  t = x6; t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  let x9 = mont_mul(t, x3);
+  t = x9; t = mont_sqr(t); t = mont_sqr(t);
+  let x11 = mont_mul(t, x2);
+  t = x11; for (var i = 0u; i < 11u; i++) { t = mont_sqr(t); }
+  let x22 = mont_mul(t, x11);
+  t = x22; for (var i = 0u; i < 22u; i++) { t = mont_sqr(t); }
+  let x44 = mont_mul(t, x22);
+  t = x44; for (var i = 0u; i < 44u; i++) { t = mont_sqr(t); }
+  let x88 = mont_mul(t, x44);
+  t = x88; for (var i = 0u; i < 88u; i++) { t = mont_sqr(t); }
+  let x176 = mont_mul(t, x88);
+  t = x176; for (var i = 0u; i < 44u; i++) { t = mont_sqr(t); }
+  let x220 = mont_mul(t, x44);
+  t = x220; t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  let x223 = mont_mul(t, x3);
+  t = x223;
+  t = mont_sqr(t);
+  for (var i = 0u; i < 22u; i++) { t = mont_sqr(t); } t = mont_mul(t, x22);
+  t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  t = mont_sqr(t);
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  t = mont_sqr(t);
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  return t;
+}
+
+fn jac_add_aff(px: U256, py: U256, pz: U256, qx: U256, qy: U256) -> JacPoint {
+  let z1z1 = mont_sqr(pz);
+  let u2 = mont_mul(qx, z1z1);
+  let s2 = mont_mul(qy, mont_mul(pz, z1z1));
+  let h = field_sub(u2, px);
+  let hh = mont_sqr(h); let hhh = mont_mul(h, hh);
+  let r = field_sub(s2, py);
+  let v = mont_mul(px, hh);
+  let x3 = field_sub(field_sub(mont_sqr(r), hhh), field_dbl(v));
+  let y3 = field_sub(mont_mul(r, field_sub(v, x3)), mont_mul(py, hhh));
+  let z3 = mont_mul(pz, h);
+  return JacPoint(x3, y3, z3);
+}
+
+struct AffineResult { x: U256, y_parity: u32, }
+fn jac_to_affine(jx: U256, jy: U256, jz: U256) -> AffineResult {
+  let zi = field_inv(jz); let zi2 = mont_sqr(zi); let zi3 = mont_mul(zi2, zi);
+  let ax = from_mont(mont_mul(jx, zi2));
+  let ay = from_mont(mont_mul(jy, zi3));
+  return AffineResult(ax, ay[0] & 1u);
+}
+
+fn scalar_add(a: U256, b: U256) -> U256 {
+  var r: U256; var carry: u32 = 0u;
+  for (var i = 0u; i < 8u; i++) {
+    let s1 = a[i] + b[i]; let c1 = select(0u, 1u, s1 < a[i]);
+    let s2 = s1 + carry; let c2 = select(0u, 1u, s2 < s1);
+    r[i] = s2; carry = c1 + c2;
+  }
+  return r;
+}
+
+// ═══ TORUS KERNEL — Triad-aware ═══
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= params.num_walks) { return; }
+  var w = walks[idx];
+  if ((w.flags & 1u) != 0u) { return; }
+
+  let triad = (w.flags >> 1u) & 3u;
+
+  // Jump table offset: [0-2]=sniper, [3-5]=scout, [6-8]=primary
+  var jbase: u32;
+  if (triad == 0u) { jbase = 6u; }
+  else if (triad == 1u) { jbase = 3u; }
+  else { jbase = 0u; }
+
+  // DP threshold per triad
+  var dp_thresh: u32; var dp_level: u32;
+  if (triad == 0u) { dp_thresh = 1024u; dp_level = 0u; }
+  else if (triad == 1u) { dp_thresh = 16384u; dp_level = 1u; }
+  else { dp_thresh = 262144u; dp_level = 2u; }
+
+  var jx = w.jx; var jy = w.jy; var jz = w.jz;
+
+  for (var step = 0u; step < params.steps_per_dispatch; step++) {
+    let j = (jx[0] % 3u) + jbase;
+    let jump = jumps[j];
+    let res = jac_add_aff(jx, jy, jz, jump.ax, jump.ay);
+    jx = res.x; jy = res.y; jz = res.z;
+    w.dist = scalar_add(w.dist, jump.d);
+    w.step_count += 1u;
+
+    if ((w.step_count % params.dp_check_interval) == 0u) {
+      let aff = jac_to_affine(jx, jy, jz);
+      if (aff.x[7] < dp_thresh) {
+        let di = atomicAdd(&dp_counter[0], 1u);
+        if (di < params.max_dp_results) {
+          var dp: DPResult;
+          dp.x = aff.x; dp.dist = w.dist;
+          dp.walk_type = w.walk_type; dp.walk_id = idx;
+          dp.level = dp_level; dp.pad = aff.y_parity;
+          dp_results[di] = dp;
+        }
+        w.dp_count += 1u;
+      }
+    }
+  }
+
+  w.jx = jx; w.jy = jy; w.jz = jz;
+  if (w.step_count > ${WALK_RESTART_STEPS}u) { w.flags = w.flags | 1u; }
+  walks[idx] = w;
+}
+`;
+
+// ═══════════════════════════════════════════════════
+// GPU INIT
+// ═══════════════════════════════════════════════════
+let device, pipeline, bindGroup;
+let walkBuffer, jumpBuffer, dpResultBuffer, dpCountBuffer, paramsBuffer;
+let numWalkers = 4096;
+let running = false;
+let startTime, totalOps = 0, dispatchCount = 0;
+let dpStore = new Map();
+let dpTame = 0, dpWild = 0, dupTrajectories = 0, crossCollisions = 0;
+let torusFoldHits = 0;
+let dpCoarse = 0, dpMedium = 0, dpFine = 0;
+let walkMetadata = [];
+let restartCount = 0;
+const WALK_SIZE = 144;
+
+async function initGPU() {
+  if (!navigator.gpu) { showError('WebGPU not supported. Use Chrome 113+.'); return false; }
+  log('Requesting GPU adapter...');
+  function withTimeout(p, ms, msg) {
+    return Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+  }
+  const adapter = await withTimeout(
+    navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }), 10000, 'GPU adapter timed out'
+  );
+  if (!adapter) { showError('No GPU adapter.'); return false; }
+  device = await withTimeout(adapter.requestDevice(), 10000, 'GPU device timed out');
+  let gpuDesc = 'GPU';
+  try {
+    if (adapter.info) gpuDesc = adapter.info.description || adapter.info.vendor || adapter.info.architecture || 'GPU';
+    else if (adapter.requestAdapterInfo) { const i = await adapter.requestAdapterInfo(); gpuDesc = i.description || i.vendor || 'GPU'; }
+  } catch(e) { gpuDesc = 'GPU'; }
+  document.getElementById('gpuName').textContent = gpuDesc;
+  document.getElementById('gpuStatus').textContent = 'Ready';
+  document.getElementById('gpuStatus').className = 'stat-val good';
+  log(`GPU: ${gpuDesc}`);
+  return true;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg; el.style.display = 'block'; log(`ERROR: ${msg}`);
+}
+
+// ═══════════════════════════════════════════════════
+// RECURSIVE SPINE JUMP TABLE
+// ═══════════════════════════════════════════════════
+function computeTorusJumpTable() {
+  log('Computing recursive spine jump table (9 entries)...');
+  const G = [Gx, Gy];
+  const rng = mulberry32(MULBERRY_K);
+  const table = [];
+  const triadSpines = [SNIPER_SPINE, SCOUT_SPINE, PRIMARY_SPINE];
+  const names = ['sniper', 'scout', 'primary'];
+
+  for (let t = 0; t < 3; t++) {
+    for (const sv of triadSpines[t]) {
+      const rawExp = sv * PHI;
+      const exp = rawExp % RANGE_BITS;
+      const base = 1n << BigInt(Math.floor(exp));
+      const jitter = BigInt((rng() % 999) + 1);
+      let d = base * jitter;
+      if (d >= RANGE_SIZE) d = d % RANGE_SIZE;
+      if (d === 0n) d = base;
+      const pt = ecMulFast(G, d);
+      table.push({ ax: toMontLimbs(pt[0]), ay: toMontLimbs(pt[1]), d: bigintToLimbs(d) });
+      log(`  ${names[t]}[${sv}]: 2^${exp.toFixed(1)} x${jitter} -> 2^${Math.log2(Number(d)).toFixed(1)}`);
+    }
+  }
+  log('Spine jump table ready');
+  return table;
+}
+
+// ═══════════════════════════════════════════════════
+// WALKER INIT — θ angles + Ψ bias
+// ═══════════════════════════════════════════════════
+function gaussianRandom(mean, std) {
+  const u1 = Math.random(), u2 = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+function randomBigInt(max) {
+  const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
+  let v = 0n; for (const b of bytes) v = (v << 8n) | BigInt(b);
+  return v % max;
+}
+
+function posToKey(pos) {
+  pos = Math.max(0, Math.min(1 - 1e-15, pos));
+  const scaled = BigInt(Math.floor(pos * Number(1n << 53n)));
+  return RANGE_LOW + ((scaled << 81n) + randomBigInt(1n << 81n)) % RANGE_SIZE;
+}
+
+function thetaPos(id) { return ((THETA_HOME + id * PHI) % 360) / 360; }
+
+async function initWalks(count) {
+  const psiBias = parseFloat(document.getElementById('psiBias').value) / 100;
+  log(`Initializing ${count} walkers (Ψ=${psiBias.toFixed(2)}, θ=${THETA_HOME}°)...`);
+  const G_pt = [Gx, Gy];
+  const target = decompressPoint(TARGET_PUBKEY_HEX);
+  const tameCount = Math.ceil(count / 2);
+  const wildCount = count - tameCount;
+  const walks = [];
+  let bayesN = 0;
+  const t0 = performance.now();
+
+  for (let i = 0; i < tameCount; i++) {
+    const triad = i % 3;
+    let startKey;
+    if (Math.random() < psiBias) {
+      startKey = posToKey(gaussianRandom(KAPPA, 0.03));
+      bayesN++;
+    } else {
+      startKey = posToKey(thetaPos(i));
+    }
+    const pt = ecMulFast(G_pt, startKey);
+    walks.push({
+      jx: toMontLimbs(pt[0]), jy: toMontLimbs(pt[1]), jz: toMontLimbs(1n),
+      dist: bigintToLimbs(startKey), walk_type: 0, step_count: 0, dp_count: 0, flags: triad << 1,
+    });
+    if ((i+1) % 200 === 0) { log(`  tame: ${i+1}/${tameCount}`); await new Promise(r => setTimeout(r, 0)); }
+  }
+  log(`  tame: ${tameCount} (${bayesN} Ψ-biased, ${tameCount-bayesN} θ-spread)`);
+
+  for (let i = 0; i < wildCount; i++) {
+    const triad = i % 3;
+    const offset = randomBigInt(RANGE_SIZE);
+    const offPt = ecMulFast(G_pt, offset);
+    const pt = ecAddFast(target, offPt);
+    walks.push({
+      jx: toMontLimbs(pt[0]), jy: toMontLimbs(pt[1]), jz: toMontLimbs(1n),
+      dist: bigintToLimbs(offset), walk_type: 1, step_count: 0, dp_count: 0, flags: triad << 1,
+    });
+    if ((i+1) % 200 === 0) { log(`  wild: ${i+1}/${wildCount}`); await new Promise(r => setTimeout(r, 0)); }
+  }
+  log(`  wild: ${wildCount} | init: ${((performance.now()-t0)/1000).toFixed(1)}s`);
+
+  const pc = walks.filter(w => ((w.flags>>1)&3)===0).length;
+  const sc = walks.filter(w => ((w.flags>>1)&3)===1).length;
+  const sn = walks.filter(w => ((w.flags>>1)&3)===2).length;
+  log(`  triads: ${pc} primary · ${sc} scout · ${sn} sniper`);
+  document.getElementById('primaryCount').textContent = pc;
+  document.getElementById('scoutCount').textContent = sc;
+  document.getElementById('sniperCount').textContent = sn;
+
+  walkMetadata = walks.map(w => ({ walk_type: w.walk_type, triad: (w.flags>>1)&3 }));
+  return walks;
+}
+
+// ═══════════════════════════════════════════════════
+// GPU BUFFERS
+// ═══════════════════════════════════════════════════
+function createBuffers(walkData, jumpData) {
+  const JUMP_SIZE = 96; const DP_SIZE = 80; const MAX_DPS = 4096;
+
+  const walkArray = new ArrayBuffer(walkData.length * WALK_SIZE);
+  const wv = new DataView(walkArray);
+  for (let i = 0; i < walkData.length; i++) {
+    const b = i * WALK_SIZE; const w = walkData[i];
+    for (let j=0;j<8;j++) wv.setUint32(b+j*4, w.jx[j], true);
+    for (let j=0;j<8;j++) wv.setUint32(b+32+j*4, w.jy[j], true);
+    for (let j=0;j<8;j++) wv.setUint32(b+64+j*4, w.jz[j], true);
+    for (let j=0;j<8;j++) wv.setUint32(b+96+j*4, w.dist[j], true);
+    wv.setUint32(b+128, w.walk_type, true);
+    wv.setUint32(b+132, w.step_count, true);
+    wv.setUint32(b+136, w.dp_count, true);
+    wv.setUint32(b+140, w.flags, true);
+  }
+  walkBuffer = device.createBuffer({ size: walkArray.byteLength, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST, mappedAtCreation: true });
+  new Uint8Array(walkBuffer.getMappedRange()).set(new Uint8Array(walkArray));
+  walkBuffer.unmap();
+
+  const jumpArray = new ArrayBuffer(9 * JUMP_SIZE);
+  const jv = new DataView(jumpArray);
+  for (let i = 0; i < 9; i++) {
+    const b = i * JUMP_SIZE;
+    for (let j=0;j<8;j++) jv.setUint32(b+j*4, jumpData[i].ax[j], true);
+    for (let j=0;j<8;j++) jv.setUint32(b+32+j*4, jumpData[i].ay[j], true);
+    for (let j=0;j<8;j++) jv.setUint32(b+64+j*4, jumpData[i].d[j], true);
+  }
+  jumpBuffer = device.createBuffer({ size: jumpArray.byteLength, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_DST, mappedAtCreation: true });
+  new Uint8Array(jumpBuffer.getMappedRange()).set(new Uint8Array(jumpArray));
+  jumpBuffer.unmap();
+
+  dpResultBuffer = device.createBuffer({ size: MAX_DPS*DP_SIZE, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC });
+  dpCountBuffer = device.createBuffer({ size: 4, usage: GPUBufferUsage.STORAGE|GPUBufferUsage.COPY_SRC|GPUBufferUsage.COPY_DST });
+
+  const pa = new Uint32Array([walkData.length, STEPS_PER_DISPATCH, STEPS_PER_DISPATCH, MAX_DPS, N0, 0, 0, 0]);
+  paramsBuffer = device.createBuffer({ size: pa.byteLength, usage: GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST, mappedAtCreation: true });
+  new Uint32Array(paramsBuffer.getMappedRange()).set(pa);
+  paramsBuffer.unmap();
+  log(`Buffers: walks=${(walkArray.byteLength/1024).toFixed(0)}KB`);
+}
+
+async function createPipeline() {
+  const sm = device.createShaderModule({ code: SHADER_SOURCE });
+  const info = await sm.getCompilationInfo();
+  for (const m of info.messages) {
+    log(`SHADER ${m.type.toUpperCase()}: L${m.lineNum}:${m.linePos} ${m.message}`);
+  }
+  if (info.messages.some(m => m.type === 'error')) throw new Error('Shader compilation failed');
+  pipeline = device.createComputePipeline({ layout: 'auto', compute: { module: sm, entryPoint: 'main' } });
+  bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: walkBuffer } },
+      { binding: 1, resource: { buffer: jumpBuffer } },
+      { binding: 2, resource: { buffer: dpResultBuffer } },
+      { binding: 3, resource: { buffer: dpCountBuffer } },
+      { binding: 4, resource: { buffer: paramsBuffer } },
+    ],
+  });
+  log('Compute pipeline compiled');
+}
+
+// ═══════════════════════════════════════════════════
+// DP READBACK
+// ═══════════════════════════════════════════════════
+async function readbackDPs(dpCount) {
+  const n = Math.min(dpCount, 4096);
+  const rb = device.createBuffer({ size: n*80, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ });
+  const cmd = device.createCommandEncoder();
+  cmd.copyBufferToBuffer(dpResultBuffer, 0, rb, 0, n*80);
+  device.queue.submit([cmd.finish()]);
+  await rb.mapAsync(GPUMapMode.READ);
+  const d = new Uint32Array(rb.getMappedRange());
+  for (let i=0;i<n;i++) {
+    const b = i*20;
+    const x = new Uint32Array(8); const dist = new Uint32Array(8);
+    for (let j=0;j<8;j++) { x[j]=d[b+j]; dist[j]=d[b+8+j]; }
+    const lvl = d[b+18]===0?'coarse':d[b+18]===1?'medium':'fine';
+    processDP(limbsToHex(x), limbsToHex(dist), d[b+16]===0?'tame':'wild', lvl, d[b+19]===0?'upper':'lower');
+  }
+  rb.unmap(); rb.destroy();
+}
+
+// ═══════════════════════════════════════════════════
+// WALK RESTARTS — triad-preserving
+// ═══════════════════════════════════════════════════
+async function handleWalkRestarts() {
+  const rb = device.createBuffer({ size: numWalkers*WALK_SIZE, usage: GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ });
+  const cmd = device.createCommandEncoder();
+  cmd.copyBufferToBuffer(walkBuffer, 0, rb, 0, numWalkers*WALK_SIZE);
+  device.queue.submit([cmd.finish()]);
+  await rb.mapAsync(GPUMapMode.READ);
+  const data = new Uint32Array(rb.getMappedRange());
+  const G_pt = [Gx, Gy]; const target = decompressPoint(TARGET_PUBKEY_HEX);
+  const WU = WALK_SIZE/4; let restarted = 0;
+  const patch = new DataView(new ArrayBuffer(WALK_SIZE));
+  const psiBias = parseFloat(document.getElementById('psiBias').value)/100;
+
+  for (let i=0;i<numWalkers;i++) {
+    if (data[i*WU+35] & 1) {
+      const wt = walkMetadata[i].walk_type;
+      const triad = walkMetadata[i].triad;
+      let pt, dv;
+      if (wt === 0) {
+        const sk = Math.random()<psiBias ? posToKey(gaussianRandom(KAPPA,0.03)) : posToKey(thetaPos(i+restartCount));
+        pt = ecMulFast(G_pt, sk); dv = sk;
+      } else {
+        const off = randomBigInt(RANGE_SIZE);
+        pt = ecAddFast(target, ecMulFast(G_pt, off)); dv = off;
+      }
+      const jx=toMontLimbs(pt[0]), jy=toMontLimbs(pt[1]), jz=toMontLimbs(1n), dist=bigintToLimbs(dv);
+      for(let j=0;j<8;j++) patch.setUint32(j*4,jx[j],true);
+      for(let j=0;j<8;j++) patch.setUint32(32+j*4,jy[j],true);
+      for(let j=0;j<8;j++) patch.setUint32(64+j*4,jz[j],true);
+      for(let j=0;j<8;j++) patch.setUint32(96+j*4,dist[j],true);
+      patch.setUint32(128,wt,true); patch.setUint32(132,0,true);
+      patch.setUint32(136,0,true); patch.setUint32(140,triad<<1,true);
+      device.queue.writeBuffer(walkBuffer, i*WALK_SIZE, patch.buffer);
+      restarted++;
+    }
+  }
+  rb.unmap(); rb.destroy();
+  if (restarted > 0) { restartCount += restarted; log(`Restarted ${restarted} walks (total: ${restartCount})`); }
+}
+
+// ═══ BROADCASTCHANNEL ═══
+const dpChannel = new BroadcastChannel('cassie-torus-dps');
+const sigChannel = new BroadcastChannel('cassie-torus-signal');
+const statChannel = new BroadcastChannel('cassie-torus-stats');
+const TAB_ID = crypto.randomUUID().slice(0,8);
+
+dpChannel.onmessage = (e) => {
+  if (e.data.tabId === TAB_ID) return;
+  processDP(e.data.x, e.data.dist, e.data.type, e.data.level, e.data.hemisphere, true);
+};
+sigChannel.onmessage = (e) => {
+  if (e.data.type === 'SOLVED') { running = false; log(`KEY FOUND BY TAB ${e.data.tabId}: ${e.data.key}`); }
+};
+
+// ═══ WEBRTC MESH — PeerJS DataChannel, full mesh, contribution ledger ═══
+let meshPeer = null;          // PeerJS instance
+let meshConns = new Map();    // peerId → DataConnection
+let meshRoom = '';            // current room code
+let meshSentCount = 0;
+let meshRecvCount = 0;
+let myBtcAddr = '';
+const ledger = new Map();     // btcAddr → { dps: 0, peerId, opsRate }
+const SYNC_CHUNK = 500;       // DPs per sync message
+
+function meshSetStatus(text, color) {
+  document.getElementById('meshStatus').textContent = text;
+  document.getElementById('meshStatus').style.color = color || '#666';
+}
+
+function meshUpdateUI() {
+  document.getElementById('meshPeers').textContent = meshConns.size;
+  document.getElementById('meshSent').textContent = meshSentCount;
+  document.getElementById('meshRecv').textContent = meshRecvCount;
+  document.getElementById('meshRoom').textContent = meshRoom || '-';
+  // Render ledger
+  const el = document.getElementById('ledgerTable');
+  if (ledger.size === 0 && meshConns.size === 0) {
+    el.innerHTML = '<div class="stat-row"><span class="stat-label">No peers connected</span></div>';
+    return;
+  }
+  // Include self
+  const myDPs = dpStore.size;
+  const totalDPs = myDPs + [...ledger.values()].reduce((s, v) => s + v.dps, 0);
+  let html = '';
+  // Self row
+  const myPct = totalDPs > 0 ? (myDPs / totalDPs * 100).toFixed(1) : '0.0';
+  const myBtc = totalDPs > 0 ? (myDPs / totalDPs * 13.5).toFixed(4) : '0.0000';
+  html += `<div class="stat-row"><span class="stat-label" style="color:#4a4">★ ${myBtcAddr||'you'}</span><span class="stat-val">${myDPs} DPs · ${myPct}% · ${myBtc} BTC</span></div>`;
+  // Peers sorted by contribution
+  const sorted = [...ledger.entries()].sort((a,b) => b[1].dps - a[1].dps);
+  for (const [addr, info] of sorted) {
+    const pct = totalDPs > 0 ? (info.dps / totalDPs * 100).toFixed(1) : '0.0';
+    const btc = totalDPs > 0 ? (info.dps / totalDPs * 13.5).toFixed(4) : '0.0000';
+    html += `<div class="stat-row"><span class="stat-label">${addr.slice(0,12)}...</span><span class="stat-val">${info.dps} DPs · ${pct}% · ${btc} BTC</span></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function meshBroadcast(msg) {
+  const data = JSON.stringify(msg);
+  for (const [pid, conn] of meshConns) {
+    if (conn.open) { try { conn.send(data); } catch(e) {} }
+  }
+}
+
+function meshSendDP(xHex, distHex, type, level, hemisphere) {
+  if (meshConns.size === 0) return;
+  meshBroadcast({ kind: 'dp', x: xHex, dist: distHex, type, level, hemisphere, addr: myBtcAddr });
+  meshSentCount++;
+}
+
+function meshSendSignal(key) {
+  if (meshConns.size === 0) return;
+  meshBroadcast({ kind: 'solved', key, addr: myBtcAddr });
+}
+
+function handleMeshMessage(data, fromPeerId) {
+  let msg;
+  try { msg = typeof data === 'string' ? JSON.parse(data) : data; } catch(e) { return; }
+
+  if (msg.kind === 'hello') {
+    // Register peer in ledger
+    if (msg.addr) ledger.set(msg.addr, { dps: msg.dpCount || 0, peerId: fromPeerId, opsRate: msg.opsRate || 0 });
+    log(`Mesh: ${fromPeerId} joined (${msg.addr ? msg.addr.slice(0,12)+'...' : 'anon'}, ${msg.dpCount||0} DPs)`);
+    // Connect to peers we don't know yet (full mesh)
+    if (msg.peers && Array.isArray(msg.peers)) {
+      for (const pid of msg.peers) {
+        if (pid !== meshPeer.id && !meshConns.has(pid)) {
+          log(`Mesh: connecting to peer ${pid}...`);
+          const c = meshPeer.connect(pid, { reliable: true });
+          setupConn(c);
+        }
+      }
+    }
+    meshUpdateUI();
+  } else if (msg.kind === 'dp') {
+    meshRecvCount++;
+    // Track in ledger
+    if (msg.addr && ledger.has(msg.addr)) ledger.get(msg.addr).dps++;
+    else if (msg.addr) ledger.set(msg.addr, { dps: 1, peerId: fromPeerId, opsRate: 0 });
+    processDP(msg.x, msg.dist, msg.type, msg.level, msg.hemisphere || 'upper', true);
+    if (meshRecvCount % 50 === 0) meshUpdateUI();
+  } else if (msg.kind === 'solved') {
+    running = false;
+    log(`MESH: KEY FOUND BY ${msg.addr || fromPeerId}! ${msg.key}`);
+    document.getElementById('collisions').textContent = 'SOLVED!';
+    document.getElementById('collisions').className = 'stat-val hot';
+    sigChannel.postMessage({ type: 'SOLVED', key: msg.key, tabId: 'mesh' });
+    autoSplitPrize(msg.key);
+  } else if (msg.kind === 'sync_req') {
+    // Peer wants our DPs — send in chunks
+    const all = [...dpStore.entries()];
+    for (let i = 0; i < all.length; i += SYNC_CHUNK) {
+      const chunk = all.slice(i, i + SYNC_CHUNK).map(([x, dp]) => ({
+        x, dist: dp.dist, type: dp.type, level: dp.level, hemisphere: dp.hemisphere
+      }));
+      const conn = meshConns.get(fromPeerId);
+      if (conn && conn.open) conn.send(JSON.stringify({ kind: 'sync', dps: chunk, total: all.length }));
+    }
+  } else if (msg.kind === 'sync') {
+    // Receiving bulk DPs from peer
+    let added = 0;
+    for (const dp of msg.dps) {
+      if (!dpStore.has(dp.x)) {
+        processDP(dp.x, dp.dist, dp.type, dp.level, dp.hemisphere || 'upper', true);
+        added++;
+      }
+    }
+    if (added > 0) log(`Mesh: synced ${added}/${msg.total||'?'} DPs from peer`);
+  } else if (msg.kind === 'peer_list') {
+    // Connect to peers we don't know
+    if (msg.peers) for (const pid of msg.peers) {
+      if (pid !== meshPeer.id && !meshConns.has(pid)) {
+        const c = meshPeer.connect(pid, { reliable: true });
+        setupConn(c);
+      }
+    }
+  }
+}
+
+function setupConn(conn) {
+  conn.on('open', () => {
+    meshConns.set(conn.peer, conn);
+    log(`Mesh: connected to ${conn.peer}`);
+    meshSetStatus(`${meshConns.size} peers`, '#4a4');
+    // Send hello with our info + list of all peers we know
+    conn.send(JSON.stringify({
+      kind: 'hello',
+      addr: myBtcAddr,
+      dpCount: dpStore.size,
+      opsRate: totalOps > 0 && startTime ? Math.round(totalOps / ((performance.now() - startTime) / 1000)) : 0,
+      peers: [...meshConns.keys()].filter(p => p !== conn.peer),
+    }));
+    // Request their DPs
+    conn.send(JSON.stringify({ kind: 'sync_req' }));
+    meshUpdateUI();
+  });
+  conn.on('data', (data) => handleMeshMessage(data, conn.peer));
+  conn.on('close', () => {
+    meshConns.delete(conn.peer);
+    log(`Mesh: ${conn.peer} disconnected`);
+    meshSetStatus(meshConns.size > 0 ? `${meshConns.size} peers` : 'Room active', meshConns.size > 0 ? '#4a4' : '#b8974a');
+    meshUpdateUI();
+  });
+  conn.on('error', (err) => {
+    log(`Mesh: connection error with ${conn.peer}`);
+    meshConns.delete(conn.peer);
+    meshUpdateUI();
+  });
+}
+
+function meshCreateRoom() {
+  myBtcAddr = document.getElementById('btcAddr').value.trim() || `anon-${TAB_ID}`;
+  const code = Math.random().toString(36).slice(2, 8).toUpperCase();
+  meshRoom = code;
+  document.getElementById('roomCode').value = code;
+  document.getElementById('meshRoom').textContent = code;
+
+  log(`Mesh: creating room ${code}...`);
+  meshSetStatus('Creating...', '#b8974a');
+
+  meshPeer = new Peer(`cassie-${code}`, { debug: 0 });
+  meshPeer.on('open', (id) => {
+    log(`Mesh: room ${code} created. Share this code with friends.`);
+    meshSetStatus('Room open', '#4a4');
+    document.getElementById('btnCreate').disabled = true;
+    document.getElementById('btnJoin').disabled = true;
+    document.getElementById('btnLeave').disabled = false;
+    meshUpdateUI();
+  });
+  meshPeer.on('connection', (conn) => {
+    log(`Mesh: incoming connection from ${conn.peer}`);
+    setupConn(conn);
+  });
+  meshPeer.on('error', (err) => {
+    log(`Mesh: error — ${err.type}`);
+    meshSetStatus('Error', '#a44');
+  });
+  meshPeer.on('disconnected', () => {
+    if (meshRoom) meshPeer.reconnect();
+  });
+}
+
+function meshJoinRoom() {
+  myBtcAddr = document.getElementById('btcAddr').value.trim() || `anon-${TAB_ID}`;
+  const code = document.getElementById('roomCode').value.trim().toUpperCase();
+  if (!code) { log('Mesh: enter a room code first'); return; }
+  meshRoom = code;
+  document.getElementById('meshRoom').textContent = code;
+
+  log(`Mesh: joining room ${code}...`);
+  meshSetStatus('Joining...', '#b8974a');
+
+  meshPeer = new Peer(undefined, { debug: 0 });
+  meshPeer.on('open', (myId) => {
+    log(`Mesh: my peer ID: ${myId}`);
+    // Connect to the room creator
+    const conn = meshPeer.connect(`cassie-${code}`, { reliable: true });
+    setupConn(conn);
+    meshSetStatus('Connecting...', '#b8974a');
+    document.getElementById('btnCreate').disabled = true;
+    document.getElementById('btnJoin').disabled = true;
+    document.getElementById('btnLeave').disabled = false;
+  });
+  meshPeer.on('connection', (conn) => {
+    log(`Mesh: incoming connection from ${conn.peer}`);
+    setupConn(conn);
+  });
+  meshPeer.on('error', (err) => {
+    log(`Mesh: error — ${err.type}`);
+    if (err.type === 'peer-unavailable') log(`Mesh: room ${code} not found. Check the code.`);
+    meshSetStatus('Error', '#a44');
+  });
+}
+
+function meshLeave() {
+  meshRoom = '';
+  for (const [pid, conn] of meshConns) { try { conn.close(); } catch(e) {} }
+  meshConns.clear();
+  if (meshPeer) { meshPeer.destroy(); meshPeer = null; }
+  meshSetStatus('Offline', '#666');
+  document.getElementById('btnCreate').disabled = false;
+  document.getElementById('btnJoin').disabled = false;
+  document.getElementById('btnLeave').disabled = true;
+  document.getElementById('meshRoom').textContent = '-';
+  log('Mesh: left room');
+  meshUpdateUI();
+}
+
+// ═══ INDEXEDDB ═══
+let dpDB = null;
+async function openDPStore() {
+  return new Promise(res => {
+    const rq = indexedDB.open('cassie-torus-dps', 1);
+    rq.onupgradeneeded = (e) => { if (!e.target.result.objectStoreNames.contains('dps')) e.target.result.createObjectStore('dps'); };
+    rq.onsuccess = (e) => { dpDB = e.target.result; res(dpDB); };
+    rq.onerror = () => res(null);
+  });
+}
+async function persistDP(xHex, data) {
+  if (!dpDB) return;
+  try { dpDB.transaction('dps','readwrite').objectStore('dps').put(data, xHex); } catch(e) {}
+}
+async function loadPersistedDPs() {
+  if (!dpDB) return 0;
+  let n = 0;
+  return new Promise(res => {
+    const rq = dpDB.transaction('dps','readonly').objectStore('dps').openCursor();
+    rq.onsuccess = (e) => {
+      const c = e.target.result;
+      if (c) { if (!dpStore.has(c.key)) { dpStore.set(c.key, c.value); n++; } c.continue(); }
+      else res(n);
+    };
+    rq.onerror = () => res(n);
+  });
+}
+
+// ═══ HEMISPHERE + TORUS FOLD ═══
+const TARGET_HEMISPHERE = 'upper';
+const torusFoldMap = new Map();
+
+function processDP(xHex, distHex, type, level, hemisphere, fromRemote) {
+  if (hemisphere && hemisphere !== TARGET_HEMISPHERE) return;
+
+  const existing = dpStore.get(xHex);
+  if (existing) {
+    if (existing.type !== type) {
+      crossCollisions++;
+      log(`CROSS COLLISION! x=${xHex.slice(0,24)}... ${existing.type}<>${type}`);
+      attemptKeyRecovery(existing, { type, dist: distHex });
+    } else { dupTrajectories++; }
+    return;
+  }
+
+  const dpData = { type, dist: distHex, level, hemisphere: hemisphere||'unknown', ts: Date.now() };
+  dpStore.set(xHex, dpData);
+  if (type === 'tame') dpTame++; else dpWild++;
+  if (level === 'coarse') dpCoarse++; else if (level === 'medium') dpMedium++; else dpFine++;
+
+  // Torus fold check
+  const xBig = BigInt('0x' + xHex);
+  const fk = (xBig % FOLD).toString();
+  const prev = torusFoldMap.get(fk);
+  if (prev) {
+    for (const p of prev) { if (p.type !== type) torusFoldHits++; }
+    prev.push({ xHex, type });
+  } else { torusFoldMap.set(fk, [{ xHex, type }]); }
+
+  persistDP(xHex, dpData);
+  if (!fromRemote) {
+    dpChannel.postMessage({ tabId: TAB_ID, x: xHex, dist: distHex, type, level, hemisphere });
+    meshSendDP(xHex, distHex, type, level, hemisphere);
+  }
+}
+
+function attemptKeyRecovery(a, b) {
+  const tame = a.type==='tame' ? a : b;
+  const wild = a.type==='wild' ? a : b;
+  const tL = BigInt('0x'+tame.dist), wA = BigInt('0x'+wild.dist);
+  for (const cand of [mod(tL-wA,N_ORDER), mod(-tL-wA,N_ORDER)]) {
+    if (cand === 0n) continue;
+    const t = ecMulFast([Gx,Gy], cand);
+    if (t && t[0] === TARGET_X) {
+      const hex = cand.toString(16).padStart(34,'0');
+      log(''); log('='.repeat(55));
+      log('  ◊·κ=1 PRIVATE KEY RECOVERED — TORUS SOLVER');
+      log(`  hex: ${hex}`); log(`  dec: ${cand}`);
+      log('='.repeat(55));
+      running = false;
+      document.getElementById('collisions').textContent = 'SOLVED!';
+      document.getElementById('collisions').className = 'stat-val hot';
+      sigChannel.postMessage({ type:'SOLVED', key:hex, tabId:TAB_ID });
+      meshSendSignal(hex);
+      autoSplitPrize(hex);
+      return;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// MEMPOOL AUTO-SPLIT — Sovereign Prize Distribution
+// When key found: derive addr → fetch UTXOs → build split tx → sign → broadcast
+// No intermediary. No custodian. Code distributes the prize.
+// ═══════════════════════════════════════════════════
+
+const _B58A = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const _BECH = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
+function _htb(h){const b=new Uint8Array(h.length/2);for(let i=0;i<b.length;i++)b[i]=parseInt(h.substr(i*2,2),16);return b}
+function _bth(b){return Array.from(b,x=>x.toString(16).padStart(2,'0')).join('')}
+function _cat(...a){let n=0;for(const x of a)n+=x.length;const r=new Uint8Array(n);let o=0;for(const x of a){r.set(x,o);o+=x.length}return r}
+function _u32le(n){return new Uint8Array([n&0xff,(n>>8)&0xff,(n>>16)&0xff,(n>>24)&0xff])}
+function _u64le(n){const bn=BigInt(n);const r=new Uint8Array(8);for(let i=0;i<8;i++)r[i]=Number((bn>>BigInt(i*8))&0xFFn);return r}
+function _vint(n){if(n<0xfd)return new Uint8Array([n]);if(n<=0xffff)return new Uint8Array([0xfd,n&0xff,(n>>8)&0xff]);return new Uint8Array([0xfe,n&0xff,(n>>8)&0xff,(n>>16)&0xff,(n>>24)&0xff])}
+
+function _b58enc(bytes){let n=0n;for(const b of bytes)n=n*256n+BigInt(b);let s='';while(n>0n){s=_B58A[Number(n%58n)]+s;n/=58n}for(const b of bytes){if(b!==0)break;s='1'+s}return s||'1'}
+function _b58dec(str){let n=0n;for(const c of str){const i=_B58A.indexOf(c);if(i<0)throw Error('bad b58');n=n*58n+BigInt(i)}let z=0;for(const c of str){if(c==='1')z++;else break}const hex=n.toString(16);const pad=hex.length%2?'0'+hex:hex;const bytes=_htb(pad);const r=new Uint8Array(z+bytes.length);r.set(bytes,z);return r}
+function _b58chkEnc(data,sha){const h=sha(sha(data));return _b58enc(_cat(data,h.slice(0,4)))}
+function _b58chkDec(str,sha){const raw=_b58dec(str);if(raw.length<5)throw Error('short');const payload=raw.slice(0,-4),check=raw.slice(-4),hash=sha(sha(payload));for(let i=0;i<4;i++)if(hash[i]!==check[i])throw Error('checksum');return payload}
+
+function _bech32poly(v){const G=[0x3b6a57b2,0x26508e6d,0x1ea119fa,0x3d4233dd,0x2a1462b3];let c=1;for(const x of v){const b=c>>25;c=((c&0x1ffffff)<<5)^x;for(let i=0;i<5;i++)if((b>>i)&1)c^=G[i]}return c}
+function _bech32dec(str){const p=str.lastIndexOf('1');if(p<1)throw Error('no sep');const hrp=str.slice(0,p).toLowerCase(),dp=str.slice(p+1).toLowerCase();const vals=[];for(const c of dp){const v=_BECH.indexOf(c);if(v<0)throw Error('bad bech32');vals.push(v)}const hrpx=[];for(const c of hrp)hrpx.push(c.charCodeAt(0)>>5);hrpx.push(0);for(const c of hrp)hrpx.push(c.charCodeAt(0)&31);const poly=_bech32poly([...hrpx,...vals]);if(poly!==1&&poly!==0x2bc830a3)throw Error('bech32 chk');const data=vals.slice(0,-6);const wv=data[0];const prog=[];let acc=0,bits=0;for(let i=1;i<data.length;i++){acc=(acc<<5)|data[i];bits+=5;while(bits>=8){bits-=8;prog.push((acc>>bits)&0xff)}}return{witVer:wv,witProg:new Uint8Array(prog)}}
+
+function _addr2script(addr,sha){
+  if(addr.toLowerCase().startsWith('bc1')){const{witVer,witProg}=_bech32dec(addr);if(witVer===0&&witProg.length===20)return _cat(new Uint8Array([0x00,0x14]),witProg);if(witVer===0&&witProg.length===32)return _cat(new Uint8Array([0x00,0x20]),witProg);if(witVer===1&&witProg.length===32)return _cat(new Uint8Array([0x51,0x20]),witProg);throw Error('unknown witness')}
+  const d=_b58chkDec(addr,sha);const ver=d[0],hash=d.slice(1);
+  if(ver===0x00&&hash.length===20)return _cat(new Uint8Array([0x76,0xa9,0x14]),hash,new Uint8Array([0x88,0xac]));
+  if(ver===0x05&&hash.length===20)return _cat(new Uint8Array([0xa9,0x14]),hash,new Uint8Array([0x87]));
+  throw Error(`unknown addr ver ${ver}`);
+}
+
+function _buildSignedTx(utxos,outputs,privKey,pubKey,sha,rip,secp){
+  const pkh=rip(sha(pubKey));
+  const myScript=_cat(new Uint8Array([0x76,0xa9,0x14]),pkh,new Uint8Array([0x88,0xac]));
+  const scriptSigs=[];
+  for(let idx=0;idx<utxos.length;idx++){
+    const parts=[_u32le(1),_vint(utxos.length)];
+    for(let i=0;i<utxos.length;i++){
+      const txid=_htb(utxos[i].txid);const rev=new Uint8Array(32);for(let j=0;j<32;j++)rev[j]=txid[31-j];
+      parts.push(rev,_u32le(utxos[i].vout));
+      if(i===idx){parts.push(_vint(myScript.length),myScript)}else{parts.push(_vint(0))}
+      parts.push(_u32le(0xffffffff));
+    }
+    parts.push(_vint(outputs.length));
+    for(const out of outputs){parts.push(_u64le(out.value),_vint(out.script.length),out.script)}
+    parts.push(_u32le(0),_u32le(1));
+    const preimage=_cat(...parts);
+    const sigHash=sha(sha(preimage));
+    const sig=secp.sign(sigHash,privKey);
+    const der=sig.toDERRawBytes();
+    const sigType=_cat(der,new Uint8Array([0x01]));
+    scriptSigs.push(_cat(new Uint8Array([sigType.length]),sigType,new Uint8Array([pubKey.length]),pubKey));
+  }
+  const parts=[_u32le(1),_vint(utxos.length)];
+  for(let i=0;i<utxos.length;i++){
+    const txid=_htb(utxos[i].txid);const rev=new Uint8Array(32);for(let j=0;j<32;j++)rev[j]=txid[31-j];
+    parts.push(rev,_u32le(utxos[i].vout),_vint(scriptSigs[i].length),scriptSigs[i],_u32le(0xffffffff));
+  }
+  parts.push(_vint(outputs.length));
+  for(const out of outputs){parts.push(_u64le(out.value),_vint(out.script.length),out.script)}
+  parts.push(_u32le(0));
+  return _cat(...parts);
+}
+
+async function autoSplitPrize(privateKeyHex) {
+  log(''); log('═══ SOVEREIGN AUTO-SPLIT ═══════════════════════════');
+  log('Building prize distribution transaction...');
+
+  let sha, rip, secp;
+  try {
+    sha = (await import('https://esm.sh/@noble/hashes/sha256')).sha256;
+    rip = (await import('https://esm.sh/@noble/hashes/ripemd160')).ripemd160;
+    secp = (await import('https://esm.sh/@noble/curves/secp256k1')).secp256k1;
+    log('Crypto libraries loaded from CDN.');
+  } catch(e) {
+    log(`Crypto import failed: ${e.message}`);
+    log(`Private key (hex): ${privateKeyHex}`);
+    log('Import key into Electrum or Sparrow wallet to sweep manually.');
+    return;
+  }
+
+  const privKey = _htb(privateKeyHex.padStart(64,'0'));
+  const pubKey = secp.getPublicKey(privKey, true);
+  const puzzleAddr = _b58chkEnc(_cat(new Uint8Array([0x00]),rip(sha(pubKey))),sha);
+  const wif = _b58chkEnc(_cat(new Uint8Array([0x80]),privKey,new Uint8Array([0x01])),sha);
+
+  log(`Address : ${puzzleAddr}`);
+  log(`WIF     : ${wif}`);
+  log(`Pubkey  : ${_bth(pubKey)}`);
+
+  let utxos;
+  try {
+    utxos = await(await fetch(`https://mempool.space/api/address/${puzzleAddr}/utxo`)).json();
+  } catch(e) { log(`UTXO fetch failed: ${e.message}. Import WIF manually.`); return; }
+  if(!utxos||!utxos.length){ log('No UTXOs found at puzzle address. Funds may have been swept.'); return; }
+
+  const totalSats = utxos.reduce((s,u)=>s+u.value,0);
+  log(`Balance : ${(totalSats/1e8).toFixed(8)} BTC (${totalSats.toLocaleString()} sats)`);
+  log(`UTXOs   : ${utxos.length}`);
+
+  const contribs = [];
+  if(myBtcAddr && myBtcAddr.length > 20) contribs.push({addr:myBtcAddr, dps:Math.max(dpStore.size,1)});
+  for(const [addr,info] of ledger){
+    if(addr && addr.length > 20 && addr !== myBtcAddr) contribs.push({addr, dps:info.dps||1});
+  }
+  if(!contribs.length){ log('No BTC addresses registered. Import WIF into wallet to sweep.'); return; }
+
+  const feeInfo = await fetch('https://mempool.space/api/v1/fees/recommended').then(r=>r.json()).catch(()=>({halfHourFee:10}));
+  const feeRate = feeInfo.halfHourFee || 10;
+  const estVsize = 10 + 148*utxos.length + 34*contribs.length;
+  const fee = estVsize * feeRate;
+  const distributable = totalSats - fee;
+  if(distributable <= 0){ log('Insufficient balance after fee.'); return; }
+
+  const totalDPs = contribs.reduce((s,c)=>s+c.dps,0);
+  log('');
+  log('SPLIT BREAKDOWN:');
+  const txOutputs = [];
+  for(const c of contribs){
+    const share = Math.floor(distributable * c.dps / totalDPs);
+    if(share <= 546){ log(`  ${c.addr}: dust (${share} sats) — skipped`); continue; }
+    try {
+      const script = _addr2script(c.addr, sha);
+      txOutputs.push({value:share, script});
+      log(`  ${c.addr}`);
+      log(`    ${(share/1e8).toFixed(8)} BTC  (${c.dps} DPs = ${(c.dps/totalDPs*100).toFixed(1)}%)`);
+    } catch(e) { log(`  ${c.addr}: invalid — skipped (${e.message})`); }
+  }
+  log(`Fee: ${fee} sats @ ${feeRate} sat/vB (~${estVsize} vB)`);
+
+  if(!txOutputs.length){ log('No valid outputs. Import WIF into Electrum to sweep.'); return; }
+
+  try {
+    const rawTx = _buildSignedTx(utxos, txOutputs, privKey, pubKey, sha, rip, secp);
+    const rawHex = _bth(rawTx);
+    log(`Tx size : ${rawTx.length} bytes`);
+    log('');
+    window._splitTxHex = rawHex;
+
+    const div = document.createElement('div');
+    div.style.cssText = 'margin:12px 0;padding:16px;background:#111;border:2px solid #4a4;border-radius:8px';
+    div.innerHTML = `
+      <div style="color:#4a4;font-size:1.1em;font-weight:bold;margin-bottom:8px">◊ SPLIT TX READY — ${txOutputs.length} recipient${txOutputs.length>1?'s':''}</div>
+      <div style="font-size:0.85em;color:#999;margin-bottom:12px">${(distributable/1e8).toFixed(8)} BTC · ${fee} sat fee · ${rawTx.length} bytes</div>
+      <button id="btnBroadcast" style="background:#4a4;color:#000;border:none;padding:10px 32px;border-radius:4px;font-weight:bold;cursor:pointer;font-size:1.1em;margin-right:12px">⚡ BROADCAST TO MEMPOOL</button>
+      <button id="btnCopyTx" style="background:#222;color:#c4bfb2;border:1px solid #555;padding:10px 16px;border-radius:4px;cursor:pointer">Copy Raw Hex</button>
+      <button id="btnCopyWIF" style="background:#222;color:#c4bfb2;border:1px solid #555;padding:10px 16px;border-radius:4px;cursor:pointer;margin-left:8px">Copy WIF</button>
+      <div style="font-size:0.75em;color:#666;margin-top:8px">manual: <a href="https://mempool.space/tx/push" target="_blank" style="color:#b8974a">mempool.space/tx/push</a> · <a href="https://mempool.space/address/${puzzleAddr}" target="_blank" style="color:#b8974a">view address</a></div>`;
+    const consoleCard = document.getElementById('console').parentNode;
+    consoleCard.parentNode.insertBefore(div, consoleCard);
+
+    document.getElementById('btnBroadcast').onclick = async()=>{
+      const btn=document.getElementById('btnBroadcast');
+      btn.disabled=true; btn.textContent='Broadcasting...';
+      try{
+        const r=await fetch('https://mempool.space/api/tx',{method:'POST',body:window._splitTxHex});
+        if(r.ok){const txid=await r.text();log(`◊ BROADCAST SUCCESS — txid: ${txid}`);log(`  https://mempool.space/tx/${txid}`);btn.textContent='✓ SENT';btn.style.background='#2a2'}
+        else{const err=await r.text();log(`Broadcast failed: ${err}`);btn.textContent='Failed — Retry';btn.disabled=false}
+      }catch(e){log(`Broadcast error: ${e.message}`);btn.textContent='Error — Retry';btn.disabled=false}
+    };
+    document.getElementById('btnCopyTx').onclick = ()=>{navigator.clipboard.writeText(window._splitTxHex);document.getElementById('btnCopyTx').textContent='Copied!';setTimeout(()=>document.getElementById('btnCopyTx').textContent='Copy Raw Hex',2000)};
+    document.getElementById('btnCopyWIF').onclick = ()=>{navigator.clipboard.writeText(wif);document.getElementById('btnCopyWIF').textContent='Copied!';setTimeout(()=>document.getElementById('btnCopyWIF').textContent='Copy WIF',2000)};
+
+  } catch(e) {
+    log(`Tx build error: ${e.message}`);
+    log(`Stack: ${e.stack}`);
+    log('Fallback: import WIF into Electrum/Sparrow to sweep manually.');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════
+async function mainLoop() {
+  startTime = performance.now();
+  let lastUpdate = startTime;
+  while (running) {
+    device.queue.writeBuffer(dpCountBuffer, 0, new Uint32Array([0]));
+    for (let b = 0; b < DISPATCHES_PER_BATCH; b++) {
+      const ce = device.createCommandEncoder();
+      const pe = ce.beginComputePass();
+      pe.setPipeline(pipeline); pe.setBindGroup(0, bindGroup);
+      pe.dispatchWorkgroups(Math.ceil(numWalkers/64)); pe.end();
+      if (b === DISPATCHES_PER_BATCH-1) {
+        const crb = device.createBuffer({ size:4, usage:GPUBufferUsage.COPY_DST|GPUBufferUsage.MAP_READ });
+        ce.copyBufferToBuffer(dpCountBuffer,0,crb,0,4);
+        device.queue.submit([ce.finish()]);
+        await crb.mapAsync(GPUMapMode.READ);
+        const dc = new Uint32Array(crb.getMappedRange())[0];
+        crb.unmap(); crb.destroy();
+        if (dc > 0) await readbackDPs(dc);
+      } else { device.queue.submit([ce.finish()]); }
+      totalOps += numWalkers * STEPS_PER_DISPATCH;
+      dispatchCount++;
+    }
+    if (dispatchCount % 4096 === 0) await handleWalkRestarts();
+    const now = performance.now();
+    if (now - lastUpdate > 1000) { updateUI(now); lastUpdate = now; }
+    await new Promise(r => setTimeout(r, 16));
+  }
+}
+
+function updateUI(now) {
+  const el = (now-startTime)/1000;
+  const rate = totalOps/el;
+  const rs = rate>=1e6?`${(rate/1e6).toFixed(2)}M/s`:rate>=1e3?`${(rate/1e3).toFixed(1)}k/s`:`${rate.toFixed(0)}/s`;
+  document.getElementById('opsRate').textContent = rs;
+  document.getElementById('totalOps').textContent = totalOps.toLocaleString();
+  document.getElementById('dispatches').textContent = dispatchCount.toLocaleString();
+  document.getElementById('coarseDPs').textContent = dpCoarse;
+  document.getElementById('mediumDPs').textContent = dpMedium;
+  document.getElementById('fineDPs').textContent = dpFine;
+  document.getElementById('twRatio').textContent = `${dpTame} / ${dpWild}`;
+  document.getElementById('collisions').textContent = crossCollisions;
+  document.getElementById('torusFoldHits').textContent = torusFoldHits;
+  document.getElementById('dupTraj').textContent = dupTrajectories;
+  document.getElementById('elapsed').textContent = `${Math.floor(el/3600)}h ${Math.floor((el%3600)/60)}m ${Math.floor(el%60)}s`;
+  statChannel.postMessage({ tabId:TAB_ID, rate, totalOps, elapsed:el, dps:dpStore.size, walkers:numWalkers });
+}
+
+// ═══ EXPORT / IMPORT / MERGE ═══
+function exportDPs() {
+  const lines = [];
+  for (const [x,dp] of dpStore) lines.push(JSON.stringify({ type:dp.type, x, dist:dp.dist, level:dp.level, hemisphere:dp.hemisphere, ts:dp.ts }));
+  if (!lines.length) { log('No DPs'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')+'\n'], {type:'text/plain'}));
+  a.download = `cassie-torus-${TAB_ID}-${new Date().toISOString().replace(/[:.]/g,'-').slice(0,19)}.ndjson`;
+  a.click(); log(`Exported ${lines.length} DPs`);
+}
+
+function importDPs() {
+  const inp = document.createElement('input');
+  inp.type='file'; inp.accept='.ndjson,.json,.txt'; inp.multiple=true;
+  inp.onchange = async (e) => {
+    let n=0;
+    for (const f of e.target.files) {
+      for (const line of (await f.text()).trim().split('\n')) {
+        try { const dp=JSON.parse(line); processDP(dp.x,dp.dist,dp.type,dp.level,dp.hemisphere||'upper',true); n++; } catch(e) {}
+      }
+    }
+    log(`Imported ${n} DPs from ${e.target.files.length} file(s)`);
+    if (startTime) updateUI(performance.now());
+  };
+  inp.click();
+}
+
+function mergeCheck() {
+  log('Merge check: scanning all DPs for cross-type collisions...');
+  let found = 0;
+  const tames = [], wilds = [];
+  for (const [x,dp] of dpStore) { if (dp.type==='tame') tames.push({x,...dp}); else wilds.push({x,...dp}); }
+  for (const t of tames) for (const w of wilds) {
+    if (t.x === w.x) { found++; log(`MERGE HIT: x=${t.x.slice(0,24)}...`); attemptKeyRecovery(t, w); }
+  }
+  log(`Merge: ${tames.length} tame x ${wilds.length} wild, ${found} collisions`);
+}
+
+// ═══════════════════════════════════════════════════
+// STARTUP
+// ═══════════════════════════════════════════════════
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+
+document.getElementById('psiBias').addEventListener('input', (e) => {
+  document.getElementById('psiBiasVal').textContent = (e.target.value/100).toFixed(2);
+});
+
+btnStart.addEventListener('click', async () => {
+  numWalkers = Math.max(64, Math.min(65536, parseInt(document.getElementById('numWalkers').value)||4096));
+  document.getElementById('numWalkers').value = numWalkers;
+  btnStart.disabled = true; btnStop.disabled = false;
+  document.getElementById('numWalkers').disabled = true;
+  document.getElementById('walkerCount').textContent = numWalkers;
+
+  try {
+    log(''); log('  ◊·κ=1 CASSIE TORUS — Recursive Spine Kangaroo Solver');
+    log('  ════════════════════════════════════════════════════');
+    log(`  target: ${TARGET_PUBKEY_HEX}`);
+    log(`  walkers: ${numWalkers} | spine: {2,3,5,11,31,127,709} | fold: 510,510`);
+    log('');
+    const jt = computeTorusJumpTable();
+    const wd = await initWalks(numWalkers);
+    createBuffers(wd, jt);
+    await createPipeline();
+    log(''); log('Torus solver started.'); log('');
+    running = true; totalOps = 0; dispatchCount = 0;
+    mainLoop();
+  } catch(e) {
+    showError(`Init failed: ${e.message}`); log(`${e.stack}`);
+    btnStart.disabled = false; document.getElementById('numWalkers').disabled = false;
+  }
+});
+
+btnStop.addEventListener('click', () => {
+  running = false; btnStart.disabled = false; btnStop.disabled = true;
+  document.getElementById('numWalkers').disabled = false; log('Stopped.');
+});
+
+document.getElementById('btnExport').addEventListener('click', exportDPs);
+document.getElementById('btnImport').addEventListener('click', importDPs);
+document.getElementById('btnMerge').addEventListener('click', mergeCheck);
+document.getElementById('btnCreate').addEventListener('click', meshCreateRoom);
+document.getElementById('btnJoin').addEventListener('click', meshJoinRoom);
+document.getElementById('btnLeave').addEventListener('click', meshLeave);
+
+(async () => {
+  try {
+    await openDPStore();
+    const restored = await loadPersistedDPs();
+    if (restored > 0) {
+      log(`Restored ${restored} DPs from IndexedDB`);
+      dpTame=0; dpWild=0; dpCoarse=0; dpMedium=0; dpFine=0;
+      for (const dp of dpStore.values()) {
+        if (dp.type==='tame') dpTame++; else dpWild++;
+        if (dp.level==='coarse') dpCoarse++; else if (dp.level==='medium') dpMedium++; else dpFine++;
+      }
+    }
+    const ok = await initGPU();
+    if (ok) {
+      btnStart.disabled = false; btnStart.textContent = 'Start Solver';
+      document.getElementById('btnExport').disabled = false;
+      document.getElementById('btnImport').disabled = false;
+      document.getElementById('btnMerge').disabled = false;
+      log(`Tab: ${TAB_ID} | BroadcastChannel: active | IndexedDB: ${dpDB?'ready':'off'}`);
+      log(`Hemisphere: ${TARGET_HEMISPHERE} | Fold: 510,510 | θ: ${THETA_HOME}°`);
+      log(`WebRTC Mesh: Create or Join a room to share DPs peer-to-peer`);
+      if (location.search.includes('autostart')) { log('Auto-starting...'); btnStart.click(); }
+    }
+  } catch(e) { showError(`Init: ${e.message}`); }
+})();
+</script>
+</body>
+</html>

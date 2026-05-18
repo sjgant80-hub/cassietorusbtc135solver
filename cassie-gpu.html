@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>BIG CASSIE GPU — WebGPU Kangaroo Solver</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0b0a0f;color:#c4bfb2;font-family:'IBM Plex Mono',monospace;padding:20px;min-height:100vh}
+h1{color:#b8974a;font-size:1.4em;margin-bottom:4px}
+h2{color:#b8974a;font-size:1em;margin:16px 0 8px;border-bottom:1px solid #222}
+.subtitle{color:#666;font-size:0.85em;margin-bottom:20px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:#111;border:1px solid #222;border-radius:6px;padding:12px}
+.card.wide{grid-column:1/-1}
+.stat-row{display:flex;justify-content:space-between;margin:4px 0;font-size:0.9em}
+.stat-label{color:#888}
+.stat-val{color:#c4bfb2;font-weight:bold}
+.stat-val.good{color:#4a4}
+.stat-val.hot{color:#b8974a}
+.stat-val.warn{color:#a44}
+#console{background:#0a0a0a;border:1px solid #222;border-radius:6px;padding:10px;
+  height:300px;overflow-y:auto;font-size:0.8em;line-height:1.5;white-space:pre-wrap}
+.btn{background:#222;color:#b8974a;border:1px solid #b8974a;padding:8px 20px;
+  border-radius:4px;cursor:pointer;font-family:inherit;font-size:0.9em;margin:4px}
+.btn:hover{background:#b8974a;color:#0b0a0f}
+.btn:disabled{opacity:0.3;cursor:not-allowed}
+.btn.primary{background:#8b1a1a;border-color:#8b1a1a;color:#c4bfb2}
+.btn.primary:hover{background:#a02020}
+.controls{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+#error{color:#f44;padding:10px;display:none;border:1px solid #f44;border-radius:6px;margin:12px 0}
+</style>
+</head>
+<body>
+
+<h1>BIG CASSIE GPU — WebGPU Kangaroo Solver</h1>
+<p class="subtitle">secp256k1 Montgomery arithmetic on GPU compute shaders | Puzzle #135</p>
+
+<div id="error"></div>
+
+<div class="controls">
+  <button class="btn primary" id="btnStart" disabled>Initializing GPU...</button>
+  <button class="btn" id="btnStop" disabled>Stop</button>
+  <button class="btn" id="btnExport" disabled>Export DPs</button>
+  <button class="btn" id="btnImport" disabled>Import DPs</button>
+  <label style="color:#888;font-size:0.85em;display:flex;align-items:center;gap:6px">
+    Walkers: <input id="numWalkers" type="number" value="4096" min="64" max="65536" step="64"
+    style="width:80px;background:#111;color:#c4bfb2;border:1px solid #333;padding:4px;font-family:inherit">
+  </label>
+</div>
+
+<div class="controls" style="align-items:center">
+  <label style="color:#888;font-size:0.85em;display:flex;align-items:center;gap:6px">
+    Relay: <input id="relayUrl" type="text" placeholder="wss://your-relay.onrender.com"
+    style="width:280px;background:#111;color:#c4bfb2;border:1px solid #333;padding:4px 8px;font-family:inherit;font-size:0.85em">
+  </label>
+  <button class="btn" id="btnRelay">Connect</button>
+  <span id="relayStatus" style="color:#666;font-size:0.8em">Disconnected</span>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h2>GPU</h2>
+    <div class="stat-row"><span class="stat-label">Device</span><span class="stat-val" id="gpuName">-</span></div>
+    <div class="stat-row"><span class="stat-label">Status</span><span class="stat-val" id="gpuStatus">Checking...</span></div>
+    <div class="stat-row"><span class="stat-label">Walkers</span><span class="stat-val" id="walkerCount">-</span></div>
+  </div>
+  <div class="card">
+    <h2>Performance</h2>
+    <div class="stat-row"><span class="stat-label">EC ops/sec</span><span class="stat-val hot" id="opsRate">-</span></div>
+    <div class="stat-row"><span class="stat-label">Total ops</span><span class="stat-val" id="totalOps">0</span></div>
+    <div class="stat-row"><span class="stat-label">Dispatches</span><span class="stat-val" id="dispatches">0</span></div>
+  </div>
+  <div class="card">
+    <h2>Distinguished Points</h2>
+    <div class="stat-row"><span class="stat-label">Coarse (22-bit)</span><span class="stat-val" id="coarseDPs">0</span></div>
+    <div class="stat-row"><span class="stat-label">Fine (14-bit)</span><span class="stat-val" id="fineDPs">0</span></div>
+    <div class="stat-row"><span class="stat-label">Tame / Wild</span><span class="stat-val" id="twRatio">- / -</span></div>
+  </div>
+  <div class="card">
+    <h2>Collision Status</h2>
+    <div class="stat-row"><span class="stat-label">Cross-type</span><span class="stat-val good" id="collisions">0</span></div>
+    <div class="stat-row"><span class="stat-label">Dup trajectory</span><span class="stat-val" id="dupTraj">0</span></div>
+    <div class="stat-row"><span class="stat-label">Elapsed</span><span class="stat-val" id="elapsed">-</span></div>
+  </div>
+  <div class="card wide">
+    <h2>Relay Mesh</h2>
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <div class="stat-row" style="flex:1"><span class="stat-label">Peers</span><span class="stat-val" id="relayPeers">0</span></div>
+      <div class="stat-row" style="flex:1"><span class="stat-label">DPs sent</span><span class="stat-val" id="relaySent">0</span></div>
+      <div class="stat-row" style="flex:1"><span class="stat-label">DPs received</span><span class="stat-val" id="relayRecv">0</span></div>
+      <div class="stat-row" style="flex:1"><span class="stat-label">Peer ID</span><span class="stat-val" id="relayPeerId">-</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card wide" style="margin-bottom:16px">
+  <h2>Console</h2>
+  <div id="console"></div>
+</div>
+
+<script type="module">
+// ═══════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════
+const P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn;
+const N_ORDER = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141n;
+const Gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798n;
+const Gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8n;
+const TARGET_PUBKEY_HEX = '02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16';
+const TARGET_X = 0x145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16n;
+const RANGE_LOW  = 0x4000000000000000000000000000000000n;
+const RANGE_HIGH = 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFn;
+const RANGE_SIZE = RANGE_HIGH - RANGE_LOW + 1n;
+
+// Montgomery constants
+const R = 1n << 256n;
+const R_MOD_P = R % P;             // = 0x1000003D1
+const R2_MOD_P = (R * R) % P;      // R^2 mod P
+
+// DP thresholds
+const COARSE_DP_BITS = 22;
+const FINE_DP_BITS = 14;
+const STEPS_PER_DISPATCH = 64;
+const WALK_RESTART_STEPS = 1 << 22;  // ~4M
+
+// Bayesian parameters
+const BAYES_CENTER = 0.60;
+const BAYES_STDDEV = 0.15;
+const BAYES_FRACTION = 0.70;
+
+// ═══════════════════════════════════════════════════
+// BIGINT EC MATH (CPU-side, for initialization only)
+// ═══════════════════════════════════════════════════
+function mod(a, m) { const r = a % m; return r < 0n ? r + m : r; }
+
+function modPow(base, exp, m) {
+  let result = 1n;
+  base = mod(base, m);
+  while (exp > 0n) {
+    if (exp & 1n) result = mod(result * base, m);
+    exp >>= 1n;
+    base = mod(base * base, m);
+  }
+  return result;
+}
+
+function modInv(a, m) { return modPow(a, m - 2n, m); }
+
+function ecAdd(p1, p2) {
+  if (!p1) return p2;
+  if (!p2) return p1;
+  const [x1, y1] = p1;
+  const [x2, y2] = p2;
+  let s;
+  if (x1 === x2 && y1 === y2) {
+    s = mod(3n * x1 * x1 * modInv(2n * y1, P), P);
+  } else if (x1 === x2) {
+    return null;
+  } else {
+    s = mod((y2 - y1) * modInv(x2 - x1, P), P);
+  }
+  const x3 = mod(s * s - x1 - x2, P);
+  const y3 = mod(s * (x1 - x3) - y1, P);
+  return [x3, y3];
+}
+
+function ecMul(point, scalar) {
+  let result = null;
+  let base = point;
+  scalar = mod(scalar, N_ORDER);
+  while (scalar > 0n) {
+    if (scalar & 1n) result = ecAdd(result, base);
+    base = ecAdd(base, base);
+    scalar >>= 1n;
+  }
+  return result;
+}
+
+// ═══ FAST JACOBIAN EC MATH (30× faster init — zero modInv during multiply) ═══
+// Jacobian: (X, Y, Z) represents affine (X/Z², Y/Z³)
+function jacDouble(jp) {
+  if (!jp) return null;
+  const [X, Y, Z] = jp;
+  if (Y === 0n) return null;
+  const YY = mod(Y * Y, P);
+  const S = mod(4n * X * YY, P);
+  const M = mod(3n * X * X, P);  // a=0 for secp256k1
+  const X3 = mod(M * M - 2n * S, P);
+  const Y3 = mod(M * (S - X3) - 8n * YY * YY, P);
+  const Z3 = mod(2n * Y * Z, P);
+  return [X3, Y3, Z3];
+}
+
+function jacAdd(p1, p2) {
+  if (!p1) return p2;
+  if (!p2) return p1;
+  const [X1, Y1, Z1] = p1;
+  const [X2, Y2, Z2] = p2;
+  const Z1sq = mod(Z1 * Z1, P);
+  const Z2sq = mod(Z2 * Z2, P);
+  const U1 = mod(X1 * Z2sq, P);
+  const U2 = mod(X2 * Z1sq, P);
+  const S1 = mod(Y1 * mod(Z2sq * Z2, P), P);
+  const S2 = mod(Y2 * mod(Z1sq * Z1, P), P);
+  const H = mod(U2 - U1, P);
+  const R = mod(S2 - S1, P);
+  if (H === 0n) {
+    if (R === 0n) return jacDouble(p1);
+    return null;
+  }
+  const HH = mod(H * H, P);
+  const HHH = mod(H * HH, P);
+  const X3 = mod(R * R - HHH - 2n * U1 * HH, P);
+  const Y3 = mod(R * mod(U1 * HH - X3, P) - S1 * HHH, P);
+  const Z3 = mod(Z1 * Z2 * H, P);
+  return [X3, Y3, Z3];
+}
+
+function jacToAffine(jp) {
+  if (!jp) return null;
+  const [X, Y, Z] = jp;
+  const Zi = modInv(Z, P);
+  const Zi2 = mod(Zi * Zi, P);
+  const Zi3 = mod(Zi2 * Zi, P);
+  return [mod(X * Zi2, P), mod(Y * Zi3, P)];
+}
+
+function ecMulFast(point, scalar) {
+  let result = null;
+  let base = [point[0], point[1], 1n];
+  scalar = mod(scalar, N_ORDER);
+  while (scalar > 0n) {
+    if (scalar & 1n) {
+      if (!result) result = [base[0], base[1], base[2]];
+      else result = jacAdd(result, base);
+    }
+    base = jacDouble(base);
+    scalar >>= 1n;
+  }
+  return jacToAffine(result);
+}
+
+function ecAddFast(p1, p2) {
+  // Add two affine points via Jacobian (1 modInv instead of 1)
+  const j1 = [p1[0], p1[1], 1n];
+  const j2 = [p2[0], p2[1], 1n];
+  return jacToAffine(jacAdd(j1, j2));
+}
+
+function decompressPoint(hex) {
+  const prefix = parseInt(hex.slice(0, 2), 16);
+  const x = BigInt('0x' + hex.slice(2));
+  const ySquared = mod(x * x * x + 7n, P);
+  let y = modPow(ySquared, (P + 1n) / 4n, P);
+  if ((y & 1n) !== BigInt(prefix & 1)) y = P - y;
+  return [x, y];
+}
+
+// ═══════════════════════════════════════════════════
+// LIMB CONVERSION (BigInt <-> u32[8])
+// ═══════════════════════════════════════════════════
+function bigintToLimbs(v) {
+  const limbs = new Uint32Array(8);
+  v = mod(v, P);
+  for (let i = 0; i < 8; i++) {
+    limbs[i] = Number(v & 0xFFFFFFFFn);
+    v >>= 32n;
+  }
+  return limbs;
+}
+
+function limbsToBigint(limbs) {
+  let v = 0n;
+  for (let i = 7; i >= 0; i--) {
+    v = (v << 32n) | BigInt(limbs[i]);
+  }
+  return v;
+}
+
+function toMont(v) { return mod(v * R, P); }
+function fromMont(v) { return mod(v * modInv(R, P), P); }
+function toMontLimbs(v) { return bigintToLimbs(toMont(v)); }
+
+// ═══════════════════════════════════════════════════
+// COMPUTE N0 (Montgomery constant)
+// ═══════════════════════════════════════════════════
+function computeN0() {
+  let p0 = 0xFFFFFC2Fn;
+  let inv = 1n;
+  for (let i = 0; i < 6; i++) {
+    inv = (inv * (2n - p0 * inv)) & 0xFFFFFFFFn;
+  }
+  return Number((-inv) & 0xFFFFFFFFn);
+}
+const N0 = computeN0();
+
+// ═══════════════════════════════════════════════════
+// CONSOLE LOGGING
+// ═══════════════════════════════════════════════════
+const conEl = document.getElementById('console');
+function log(msg) {
+  const ts = new Date().toISOString().slice(11, 19);
+  conEl.textContent += `[${ts}] ${msg}\n`;
+  conEl.scrollTop = conEl.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════
+// WGSL SHADER SOURCE
+// ═══════════════════════════════════════════════════
+const SHADER_SOURCE = `
+// ═══ BIG CASSIE GPU ═══ secp256k1 Montgomery Arithmetic ═══
+// CIOS Montgomery multiplication with 8x32-bit limbs
+
+// --- Types ---
+alias U256 = array<u32, 8>;
+
+struct JacPoint {
+  x: U256, y: U256, z: U256,
+}
+
+struct AffPoint {
+  x: U256, y: U256,
+}
+
+struct WalkState {
+  jx: U256, jy: U256, jz: U256,
+  dist: U256,
+  walk_type: u32,   // 0=tame, 1=wild
+  step_count: u32,
+  dp_count: u32,
+  flags: u32,       // bit0=needs_restart
+}
+
+struct JumpEntry {
+  ax: U256, ay: U256,  // affine point (in Montgomery form)
+  d: U256,             // jump distance (regular form)
+}
+
+struct DPResult {
+  x: U256,
+  dist: U256,
+  walk_type: u32,
+  walk_id: u32,
+  level: u32,  // 0=coarse, 1=fine
+  pad: u32,
+}
+
+struct Params {
+  num_walks: u32,
+  steps_per_dispatch: u32,
+  dp_check_interval: u32,
+  max_dp_results: u32,
+  n0: u32,      // Montgomery constant
+  pad1: u32,
+  pad2: u32,
+  pad3: u32,
+}
+
+// --- Bindings ---
+@group(0) @binding(0) var<storage, read_write> walks: array<WalkState>;
+@group(0) @binding(1) var<storage, read> jumps: array<JumpEntry, 32>;
+@group(0) @binding(2) var<storage, read_write> dp_results: array<DPResult>;
+@group(0) @binding(3) var<storage, read_write> dp_counter: array<atomic<u32>, 1>;
+@group(0) @binding(4) var<uniform> params: Params;
+
+// --- Field prime (little-endian u32 limbs) ---
+// p = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+const FP0: u32 = 0xFFFFFC2Fu;
+const FP1: u32 = 0xFFFFFFFEu;
+const FP2: u32 = 0xFFFFFFFFu;
+const FP3: u32 = 0xFFFFFFFFu;
+const FP4: u32 = 0xFFFFFFFFu;
+const FP5: u32 = 0xFFFFFFFFu;
+const FP6: u32 = 0xFFFFFFFFu;
+const FP7: u32 = 0xFFFFFFFFu;
+
+fn fp() -> U256 {
+  return U256(FP0, FP1, FP2, FP3, FP4, FP5, FP6, FP7);
+}
+
+// --- Wide multiply: u32 x u32 -> (lo, hi) ---
+fn wmul(a: u32, b: u32) -> vec2<u32> {
+  let al = a & 0xFFFFu;
+  let ah = a >> 16u;
+  let bl = b & 0xFFFFu;
+  let bh = b >> 16u;
+  let ll = al * bl;
+  let lh = al * bh;
+  let hl = ah * bl;
+  let hh = ah * bh;
+  let mid = lh + hl;
+  let mid_c = select(0u, 1u, mid < lh);
+  let lo = ll + (mid << 16u);
+  let lo_c = select(0u, 1u, lo < ll);
+  let hi = hh + (mid >> 16u) + (mid_c << 16u) + lo_c;
+  return vec2<u32>(lo, hi);
+}
+
+// --- u256 comparison: a >= b ---
+fn u256_gte(a: U256, b: U256) -> bool {
+  // Check from most significant limb
+  if (a[7] != b[7]) { return a[7] > b[7]; }
+  if (a[6] != b[6]) { return a[6] > b[6]; }
+  if (a[5] != b[5]) { return a[5] > b[5]; }
+  if (a[4] != b[4]) { return a[4] > b[4]; }
+  if (a[3] != b[3]) { return a[3] > b[3]; }
+  if (a[2] != b[2]) { return a[2] > b[2]; }
+  if (a[1] != b[1]) { return a[1] > b[1]; }
+  return a[0] >= b[0];
+}
+
+// --- u256 subtraction: a - b (assumes a >= b) ---
+fn u256_sub(a: U256, b: U256) -> U256 {
+  var r: U256;
+  var borrow: u32 = 0u;
+  for (var i = 0u; i < 8u; i++) {
+    let bi = b[i] + borrow;
+    let bi_c = select(0u, 1u, bi < borrow);
+    let d = a[i] - bi;
+    let d_c = select(0u, 1u, a[i] < bi);
+    r[i] = d;
+    borrow = bi_c | d_c;
+  }
+  return r;
+}
+
+// --- Field addition: (a + b) mod p ---
+fn field_add(a: U256, b: U256) -> U256 {
+  var r: U256;
+  var carry: u32 = 0u;
+  for (var i = 0u; i < 8u; i++) {
+    let s1 = a[i] + b[i];
+    let c1 = select(0u, 1u, s1 < a[i]);
+    let s2 = s1 + carry;
+    let c2 = select(0u, 1u, s2 < s1);
+    r[i] = s2;
+    carry = c1 + c2;
+  }
+  let p = fp();
+  if (carry > 0u || u256_gte(r, p)) {
+    r = u256_sub(r, p);
+  }
+  return r;
+}
+
+// --- Field subtraction: (a - b) mod p ---
+fn field_sub(a: U256, b: U256) -> U256 {
+  if (u256_gte(a, b)) {
+    return u256_sub(a, b);
+  }
+  // a < b: return p - (b - a)
+  return u256_sub(fp(), u256_sub(b, a));
+}
+
+// --- Field double: 2*a mod p ---
+fn field_dbl(a: U256) -> U256 {
+  return field_add(a, a);
+}
+
+// ═══ CIOS Montgomery Multiplication ═══
+// Computes a * b * R^(-1) mod p where R = 2^256
+// Uses 128 wide multiplies (64 for product + 64 for reduction)
+fn mont_mul(a: U256, b: U256) -> U256 {
+  var t: array<u32, 10>;
+  for (var k = 0u; k < 10u; k++) { t[k] = 0u; }
+
+  let n0 = params.n0;
+  let p = fp();
+
+  for (var i = 0u; i < 8u; i++) {
+    let ai = a[i];
+
+    // Step A: t += a[i] * b
+    var C: u32 = 0u;
+    for (var j = 0u; j < 8u; j++) {
+      let uv = wmul(ai, b[j]);
+      let s1 = t[j] + uv.x;
+      let c1 = select(0u, 1u, s1 < t[j]);
+      let s2 = s1 + C;
+      let c2 = select(0u, 1u, s2 < s1);
+      t[j] = s2;
+      C = uv.y + c1 + c2;
+    }
+    let s8a = t[8] + C;
+    let c8a = select(0u, 1u, s8a < t[8]);
+    t[8] = s8a;
+    t[9] = t[9] + c8a;
+
+    // Step B: m = t[0] * n0, then t += m*p, then t >>= 32
+    let m = t[0] * n0;
+
+    // j=0: (C, S) = t[0] + m*p[0]. S is discarded (it's 0 by construction).
+    let uv0 = wmul(m, p[0]);
+    let s0 = t[0] + uv0.x;
+    C = uv0.y + select(0u, 1u, s0 < t[0]);
+
+    // j=1..7: (C, S) = t[j] + m*p[j] + C; t[j-1] = S
+    for (var j = 1u; j < 8u; j++) {
+      let uv = wmul(m, p[j]);
+      let s1 = t[j] + uv.x;
+      let c1 = select(0u, 1u, s1 < t[j]);
+      let s2 = s1 + C;
+      let c2 = select(0u, 1u, s2 < s1);
+      t[j - 1u] = s2;
+      C = uv.y + c1 + c2;
+    }
+    // Final: t[7] = t[8]+C, t[8] = t[9]+carry, t[9] = 0
+    let s7 = t[8] + C;
+    let c7 = select(0u, 1u, s7 < t[8]);
+    t[7] = s7;
+    t[8] = t[9] + c7;
+    t[9] = 0u;
+  }
+
+  // Conditional subtraction
+  var result: U256;
+  for (var k = 0u; k < 8u; k++) { result[k] = t[k]; }
+
+  if (t[8] > 0u || u256_gte(result, p)) {
+    result = u256_sub(result, p);
+  }
+  return result;
+}
+
+// --- Montgomery squaring (uses mont_mul, could be optimized) ---
+fn mont_sqr(a: U256) -> U256 {
+  return mont_mul(a, a);
+}
+
+// --- Convert from Montgomery form ---
+fn from_mont(a: U256) -> U256 {
+  let one = U256(1u, 0u, 0u, 0u, 0u, 0u, 0u, 0u);
+  return mont_mul(a, one);
+}
+
+// ═══ Field Inversion via Fermat: a^(p-2) mod p ═══
+// Optimized addition chain for secp256k1
+// p-2 binary: [223 ones][0][22 ones][0000][1][0][1][1][0][1]
+fn field_inv(a: U256) -> U256 {
+  let x1 = a;
+
+  // x2 = a^(2^2-1) = a^3
+  let x2 = mont_mul(mont_sqr(a), a);
+
+  // x3 = a^(2^3-1) = a^7
+  let x3 = mont_mul(mont_sqr(x2), x1);
+
+  // x6 = a^(2^6-1) = a^63
+  var t = x3;
+  t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  let x6 = mont_mul(t, x3);
+
+  // x9 = a^(2^9-1) = a^511
+  t = x6;
+  t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  let x9 = mont_mul(t, x3);
+
+  // x11 = a^(2^11-1) = a^2047
+  t = x9;
+  t = mont_sqr(t); t = mont_sqr(t);
+  let x11 = mont_mul(t, x2);
+
+  // x22 = a^(2^22-1)
+  t = x11;
+  for (var i = 0u; i < 11u; i++) { t = mont_sqr(t); }
+  let x22 = mont_mul(t, x11);
+
+  // x44 = a^(2^44-1)
+  t = x22;
+  for (var i = 0u; i < 22u; i++) { t = mont_sqr(t); }
+  let x44 = mont_mul(t, x22);
+
+  // x88 = a^(2^88-1)
+  t = x44;
+  for (var i = 0u; i < 44u; i++) { t = mont_sqr(t); }
+  let x88 = mont_mul(t, x44);
+
+  // x176 = a^(2^176-1)
+  t = x88;
+  for (var i = 0u; i < 88u; i++) { t = mont_sqr(t); }
+  let x176 = mont_mul(t, x88);
+
+  // x220 = a^(2^220-1)
+  t = x176;
+  for (var i = 0u; i < 44u; i++) { t = mont_sqr(t); }
+  let x220 = mont_mul(t, x44);
+
+  // x223 = a^(2^223-1)
+  t = x220;
+  t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+  let x223 = mont_mul(t, x3);
+
+  // Now build exponent p-2 via left-to-right scan of remaining 33 bits:
+  //   bit 32 = 0
+  //   bits 31..10 = 22 ones
+  //   bits 9..6 = 0000
+  //   bit 5 = 1, bit 4 = 0, bit 3 = 1, bit 2 = 1, bit 1 = 0, bit 0 = 1
+  //
+  // Starting from x223 = a^(2^223 - 1), process remaining 33 bits:
+
+  t = x223;
+
+  // Bit 32 = 0: just square
+  t = mont_sqr(t);
+
+  // Bits 31..10 = 22 ones: square 22 times then multiply by x22
+  for (var i = 0u; i < 22u; i++) { t = mont_sqr(t); }
+  t = mont_mul(t, x22);
+
+  // Bits 9..6 = 0000: four squarings
+  t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t); t = mont_sqr(t);
+
+  // Bit 5 = 1
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  // Bit 4 = 0
+  t = mont_sqr(t);
+  // Bit 3 = 1
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  // Bit 2 = 1
+  t = mont_sqr(t); t = mont_mul(t, x1);
+  // Bit 1 = 0
+  t = mont_sqr(t);
+  // Bit 0 = 1
+  t = mont_sqr(t); t = mont_mul(t, x1);
+
+  return t;
+}
+
+// ═══ Jacobian Mixed Addition: Jac + Aff -> Jac ═══
+// P = (X1,Y1,Z1) Jacobian, Q = (x2,y2) Affine (both in Montgomery form)
+// All field ops are Montgomery
+fn jac_add_aff(px: U256, py: U256, pz: U256, qx: U256, qy: U256) -> JacPoint {
+  // Z1Z1 = Z1^2
+  let z1z1 = mont_sqr(pz);
+  // U2 = x2 * Z1Z1
+  let u2 = mont_mul(qx, z1z1);
+  // S2 = y2 * Z1 * Z1Z1
+  let s2 = mont_mul(qy, mont_mul(pz, z1z1));
+  // H = U2 - X1
+  let h = field_sub(u2, px);
+  // HH = H^2
+  let hh = mont_sqr(h);
+  // HHH = H * HH
+  let hhh = mont_mul(h, hh);
+  // R = S2 - Y1
+  let r = field_sub(s2, py);
+  // V = X1 * HH
+  let v = mont_mul(px, hh);
+  // X3 = R^2 - HHH - 2*V
+  let r2 = mont_sqr(r);
+  let x3 = field_sub(field_sub(r2, hhh), field_dbl(v));
+  // Y3 = R*(V - X3) - Y1*HHH
+  let y3 = field_sub(mont_mul(r, field_sub(v, x3)), mont_mul(py, hhh));
+  // Z3 = Z1 * H
+  let z3 = mont_mul(pz, h);
+
+  return JacPoint(x3, y3, z3);
+}
+
+// ═══ Affine X extraction + Y-parity from Jacobian ═══
+// Returns affine x in result.x, y-parity (0=even, 1=odd) in result.y[0]
+struct AffineResult {
+  x: U256,
+  y_parity: u32,
+}
+
+fn jac_to_affine(jx: U256, jy: U256, jz: U256) -> AffineResult {
+  let z_inv = field_inv(jz);
+  let z_inv2 = mont_sqr(z_inv);
+  let z_inv3 = mont_mul(z_inv2, z_inv);
+  let ax_mont = mont_mul(jx, z_inv2);
+  let ay_mont = mont_mul(jy, z_inv3);
+  let aff_x = from_mont(ax_mont);
+  let aff_y = from_mont(ay_mont);
+  // y-parity = least significant bit of affine y
+  let y_par = aff_y[0] & 1u;
+  return AffineResult(aff_x, y_par);
+}
+
+// ═══ Scalar addition (for distance accumulation, NOT field arithmetic) ═══
+fn scalar_add(a: U256, b: U256) -> U256 {
+  var r: U256;
+  var carry: u32 = 0u;
+  for (var i = 0u; i < 8u; i++) {
+    let s1 = a[i] + b[i];
+    let c1 = select(0u, 1u, s1 < a[i]);
+    let s2 = s1 + carry;
+    let c2 = select(0u, 1u, s2 < s1);
+    r[i] = s2;
+    carry = c1 + c2;
+  }
+  return r;
+}
+
+// ═══ MAIN COMPUTE KERNEL ═══
+@compute @workgroup_size(64)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let idx = gid.x;
+  if (idx >= params.num_walks) { return; }
+
+  // Load walk state
+  var w = walks[idx];
+
+  // Skip if walk needs restart (handled by CPU)
+  if ((w.flags & 1u) != 0u) { return; }
+
+  var jx = w.jx;
+  var jy = w.jy;
+  var jz = w.jz;
+
+  for (var step = 0u; step < params.steps_per_dispatch; step++) {
+    // Jump selection: use low 5 bits of projective X
+    let j = jx[0] & 31u;
+
+    // Mixed Jacobian + Affine addition
+    let jump = jumps[j];
+    let result = jac_add_aff(jx, jy, jz, jump.ax, jump.ay);
+    jx = result.x;
+    jy = result.y;
+    jz = result.z;
+
+    // Accumulate distance
+    w.dist = scalar_add(w.dist, jump.d);
+    w.step_count += 1u;
+
+    // DP check at interval
+    if ((w.step_count % params.dp_check_interval) == 0u) {
+      // Compute affine x + y-parity (expensive: includes field inversion)
+      let aff = jac_to_affine(jx, jy, jz);
+
+      // Coarse DP: top 22 bits zero means aff.x < 2^234
+      let is_coarse = (aff.x[7] < 1024u);
+
+      // Fine DP: top 14 bits zero means aff.x < 2^242
+      let is_fine = (aff.x[7] < 262144u);
+
+      if (is_coarse || is_fine) {
+        let dp_idx = atomicAdd(&dp_counter[0], 1u);
+        if (dp_idx < params.max_dp_results) {
+          var dp: DPResult;
+          dp.x = aff.x;
+          dp.dist = w.dist;
+          dp.walk_type = w.walk_type;
+          dp.walk_id = idx;
+          dp.level = select(1u, 0u, is_coarse);
+          dp.pad = aff.y_parity;  // 0=even, 1=odd — hemisphere tag
+          dp_results[dp_idx] = dp;
+        }
+        w.dp_count += 1u;
+      }
+    }
+  }
+
+  // Write back
+  w.jx = jx;
+  w.jy = jy;
+  w.jz = jz;
+
+  // Flag for restart if exceeded max steps
+  if (w.step_count > ${WALK_RESTART_STEPS}u) {
+    w.flags = w.flags | 1u;
+  }
+
+  walks[idx] = w;
+}
+`;
+
+// ═══════════════════════════════════════════════════
+// WEBGPU INITIALIZATION
+// ═══════════════════════════════════════════════════
+let device, pipeline, bindGroup;
+let walkBuffer, jumpBuffer, dpResultBuffer, dpCountBuffer, paramsBuffer;
+let numWalkers = 4096;
+let running = false;
+let startTime, totalOps = 0, dispatchCount = 0;
+let dpStore = { coarse: new Map(), fine: new Map() };
+let dpTame = 0, dpWild = 0, dupTrajectories = 0, crossCollisions = 0;
+let walkMetadata = [];  // CPU-side walk type tracking for restarts
+let restartCount = 0;
+const WALK_SIZE = 144;  // bytes per WalkState in GPU buffer
+
+async function initGPU() {
+  if (!navigator.gpu) {
+    showError('WebGPU not supported. Use Chrome 113+ or Edge 113+.');
+    return false;
+  }
+
+  log('Requesting GPU adapter...');
+
+  // Timeout wrapper — requestAdapter can hang if GPU is locked by other tabs
+  function withTimeout(promise, ms, msg) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(msg)), ms))
+    ]);
+  }
+
+  const adapter = await withTimeout(
+    navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }),
+    10000, 'GPU adapter request timed out — close other GPU tabs and retry'
+  );
+  if (!adapter) {
+    showError('No GPU adapter found.');
+    return false;
+  }
+
+  device = await withTimeout(
+    adapter.requestDevice(),
+    10000, 'GPU device request timed out — GPU may be locked by other tabs'
+  );
+
+  // Handle both old (requestAdapterInfo) and new (adapter.info) Chrome APIs
+  let gpuDesc = 'GPU';
+  try {
+    if (adapter.info) {
+      gpuDesc = adapter.info.description || adapter.info.vendor || adapter.info.architecture || 'GPU';
+    } else if (adapter.requestAdapterInfo) {
+      const info = await adapter.requestAdapterInfo();
+      gpuDesc = info.description || info.vendor || 'GPU';
+    }
+  } catch(e) {
+    gpuDesc = 'GPU (info unavailable)';
+  }
+
+  document.getElementById('gpuName').textContent = gpuDesc;
+  document.getElementById('gpuStatus').textContent = 'Ready';
+  document.getElementById('gpuStatus').className = 'stat-val good';
+
+  log(`GPU: ${gpuDesc}`);
+  log(`WebGPU initialized`);
+  return true;
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = msg;
+  el.style.display = 'block';
+  log(`ERROR: ${msg}`);
+}
+
+// ═══════════════════════════════════════════════════
+// JUMP TABLE COMPUTATION
+// ═══════════════════════════════════════════════════
+function computeJumpTable() {
+  log('Computing jump table (32 EC multiplications)...');
+  const G = [Gx, Gy];
+  const table = [];
+  for (let j = 0; j < 32; j++) {
+    const d = 1n << BigInt(j + 41);
+    const pt = ecMulFast(G, d);
+    table.push({
+      ax: toMontLimbs(pt[0]),
+      ay: toMontLimbs(pt[1]),
+      d: bigintToLimbs(d),  // distance in regular form
+    });
+    if ((j + 1) % 8 === 0) log(`  jump table: ${j + 1}/32`);
+  }
+  log('Jump table ready');
+  return table;
+}
+
+// ═══════════════════════════════════════════════════
+// WALK STATE INITIALIZATION
+// ═══════════════════════════════════════════════════
+function gaussianRandom(mean, std) {
+  const u1 = Math.random(), u2 = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+}
+
+function randomBigInt(max) {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  let v = 0n;
+  for (const b of bytes) v = (v << 8n) | BigInt(b);
+  return v % max;
+}
+
+function posToKey(pos) {
+  pos = Math.max(0, Math.min(1 - 1e-15, pos));
+  const scaled = BigInt(Math.floor(pos * Number(1n << 53n)));
+  const offset = (scaled << 81n) + randomBigInt(1n << 81n);
+  return RANGE_LOW + (offset % RANGE_SIZE);
+}
+
+async function initWalks(count) {
+  log(`Initializing ${count} walkers (Bayesian bias)...`);
+  const G_pt = [Gx, Gy];
+  const target = decompressPoint(TARGET_PUBKEY_HEX);
+  const tameCount = Math.ceil(count / 2);
+  const wildCount = count - tameCount;
+  const walks = [];
+  let bayesCount = 0;
+  const t0 = performance.now();
+
+  // Tame walkers
+  for (let i = 0; i < tameCount; i++) {
+    let startKey;
+    if (Math.random() < BAYES_FRACTION) {
+      startKey = posToKey(gaussianRandom(BAYES_CENTER, BAYES_STDDEV));
+      bayesCount++;
+    } else {
+      startKey = RANGE_LOW + randomBigInt(RANGE_SIZE);
+    }
+    const pt = ecMulFast(G_pt, startKey);
+    walks.push({
+      jx: toMontLimbs(pt[0]),
+      jy: toMontLimbs(pt[1]),
+      jz: toMontLimbs(1n),
+      dist: bigintToLimbs(startKey),
+      walk_type: 0,
+      step_count: 0,
+      dp_count: 0,
+      flags: 0,
+    });
+    if ((i + 1) % 200 === 0) {
+      log(`  tame walks: ${i + 1}/${tameCount}`);
+      await new Promise(r => setTimeout(r, 0));  // yield for UI
+    }
+  }
+  log(`  tame: ${tameCount} (${bayesCount} Bayesian, ${tameCount - bayesCount} uniform)`);
+
+  // Wild walkers
+  for (let i = 0; i < wildCount; i++) {
+    const offset = randomBigInt(RANGE_SIZE);
+    const offsetPt = ecMulFast(G_pt, offset);
+    const pt = ecAddFast(target, offsetPt);
+    walks.push({
+      jx: toMontLimbs(pt[0]),
+      jy: toMontLimbs(pt[1]),
+      jz: toMontLimbs(1n),
+      dist: bigintToLimbs(offset),
+      walk_type: 1,
+      step_count: 0,
+      dp_count: 0,
+      flags: 0,
+    });
+    if ((i + 1) % 200 === 0) {
+      log(`  wild walks: ${i + 1}/${wildCount}`);
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  const initSec = ((performance.now() - t0) / 1000).toFixed(1);
+  log(`  wild: ${wildCount} (uniform offset)`);
+  log(`  init time: ${initSec}s`);
+
+  // Store metadata for CPU-side restart handling
+  walkMetadata = walks.map(w => ({ walk_type: w.walk_type }));
+
+  return walks;
+}
+
+// ═══════════════════════════════════════════════════
+// GPU BUFFER SETUP
+// ═══════════════════════════════════════════════════
+function createBuffers(walkData, jumpData) {
+  // WALK_SIZE is defined as module-level const = 144 bytes
+  const JUMP_SIZE = 96;  // 3 × U256 = 3 × 32
+  const DP_SIZE = 80;    // 2 × U256 + 4 × u32
+  const MAX_DPS = 4096;
+
+  // Walk buffer
+  const walkArray = new ArrayBuffer(walkData.length * WALK_SIZE);
+  const walkView = new DataView(walkArray);
+  for (let i = 0; i < walkData.length; i++) {
+    const base = i * WALK_SIZE;
+    const w = walkData[i];
+    for (let j = 0; j < 8; j++) { walkView.setUint32(base + j * 4, w.jx[j], true); }
+    for (let j = 0; j < 8; j++) { walkView.setUint32(base + 32 + j * 4, w.jy[j], true); }
+    for (let j = 0; j < 8; j++) { walkView.setUint32(base + 64 + j * 4, w.jz[j], true); }
+    for (let j = 0; j < 8; j++) { walkView.setUint32(base + 96 + j * 4, w.dist[j], true); }
+    walkView.setUint32(base + 128, w.walk_type, true);
+    walkView.setUint32(base + 132, w.step_count, true);
+    walkView.setUint32(base + 136, w.dp_count, true);
+    walkView.setUint32(base + 140, w.flags, true);
+  }
+
+  walkBuffer = device.createBuffer({
+    size: walkArray.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
+  });
+  new Uint8Array(walkBuffer.getMappedRange()).set(new Uint8Array(walkArray));
+  walkBuffer.unmap();
+
+  // Jump buffer
+  const jumpArray = new ArrayBuffer(32 * JUMP_SIZE);
+  const jumpView = new DataView(jumpArray);
+  for (let i = 0; i < 32; i++) {
+    const base = i * JUMP_SIZE;
+    for (let j = 0; j < 8; j++) { jumpView.setUint32(base + j * 4, jumpData[i].ax[j], true); }
+    for (let j = 0; j < 8; j++) { jumpView.setUint32(base + 32 + j * 4, jumpData[i].ay[j], true); }
+    for (let j = 0; j < 8; j++) { jumpView.setUint32(base + 64 + j * 4, jumpData[i].d[j], true); }
+  }
+
+  jumpBuffer = device.createBuffer({
+    size: jumpArray.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
+  });
+  new Uint8Array(jumpBuffer.getMappedRange()).set(new Uint8Array(jumpArray));
+  jumpBuffer.unmap();
+
+  // DP result buffer
+  dpResultBuffer = device.createBuffer({
+    size: MAX_DPS * DP_SIZE,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+  });
+
+  // DP counter buffer
+  dpCountBuffer = device.createBuffer({
+    size: 4,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
+  });
+
+  // Params buffer
+  const paramsArray = new Uint32Array([
+    walkData.length,        // num_walks
+    STEPS_PER_DISPATCH,     // steps_per_dispatch
+    STEPS_PER_DISPATCH,     // dp_check_interval (check at end of dispatch)
+    MAX_DPS,                // max_dp_results
+    N0,                     // Montgomery constant
+    0, 0, 0,                // padding
+  ]);
+
+  paramsBuffer = device.createBuffer({
+    size: paramsArray.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
+  });
+  new Uint32Array(paramsBuffer.getMappedRange()).set(paramsArray);
+  paramsBuffer.unmap();
+
+  log(`Buffers created: walks=${(walkArray.byteLength/1024).toFixed(0)}KB`);
+}
+
+async function createPipeline() {
+  const shaderModule = device.createShaderModule({
+    code: SHADER_SOURCE,
+  });
+
+  // Check for compilation errors
+  const info = await shaderModule.getCompilationInfo();
+  for (const msg of info.messages) {
+    const prefix = msg.type === 'error' ? 'SHADER ERROR' : msg.type === 'warning' ? 'SHADER WARN' : 'SHADER';
+    log(`${prefix}: line ${msg.lineNum}:${msg.linePos} ${msg.message}`);
+  }
+  if (info.messages.some(m => m.type === 'error')) {
+    throw new Error('Shader compilation failed');
+  }
+
+  pipeline = device.createComputePipeline({
+    layout: 'auto',
+    compute: {
+      module: shaderModule,
+      entryPoint: 'main',
+    },
+  });
+
+  bindGroup = device.createBindGroup({
+    layout: pipeline.getBindGroupLayout(0),
+    entries: [
+      { binding: 0, resource: { buffer: walkBuffer } },
+      { binding: 1, resource: { buffer: jumpBuffer } },
+      { binding: 2, resource: { buffer: dpResultBuffer } },
+      { binding: 3, resource: { buffer: dpCountBuffer } },
+      { binding: 4, resource: { buffer: paramsBuffer } },
+    ],
+  });
+
+  log('Compute pipeline compiled');
+}
+
+// ═══════════════════════════════════════════════════
+// DP READBACK
+// ═══════════════════════════════════════════════════
+async function readbackDPs(dpCount) {
+  const dpReadBuffer = device.createBuffer({
+    size: Math.min(dpCount, 4096) * 80,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+  const cmd = device.createCommandEncoder();
+  cmd.copyBufferToBuffer(dpResultBuffer, 0, dpReadBuffer, 0, Math.min(dpCount, 4096) * 80);
+  device.queue.submit([cmd.finish()]);
+
+  await dpReadBuffer.mapAsync(GPUMapMode.READ);
+  const dpData = new Uint32Array(dpReadBuffer.getMappedRange());
+
+  const count = Math.min(dpCount, 4096);
+  for (let i = 0; i < count; i++) {
+    const base = i * 20; // 80 bytes / 4 = 20 u32s
+    const x = new Uint32Array(8);
+    const dist = new Uint32Array(8);
+    for (let j = 0; j < 8; j++) x[j] = dpData[base + j];
+    for (let j = 0; j < 8; j++) dist[j] = dpData[base + 8 + j];
+    const walkType = dpData[base + 16];
+    const level = dpData[base + 18];
+    const yParity = dpData[base + 19];  // 0=even, 1=odd — hemisphere
+
+    const xHex = limbsToHex(x);
+    const distHex = limbsToHex(dist);
+    const type = walkType === 0 ? 'tame' : 'wild';
+    const lvl = level === 0 ? 'coarse' : 'fine';
+    const hemisphere = yParity === 0 ? 'upper' : 'lower';
+
+    processDP(xHex, distHex, type, lvl, hemisphere);
+  }
+  dpReadBuffer.unmap();
+  dpReadBuffer.destroy();
+}
+
+async function handleWalkRestarts() {
+  // Read back walk states to check for restart flags
+  const readBuffer = device.createBuffer({
+    size: numWalkers * WALK_SIZE,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+  const cmd = device.createCommandEncoder();
+  cmd.copyBufferToBuffer(walkBuffer, 0, readBuffer, 0, numWalkers * WALK_SIZE);
+  device.queue.submit([cmd.finish()]);
+  await readBuffer.mapAsync(GPUMapMode.READ);
+  const data = new Uint32Array(readBuffer.getMappedRange());
+
+  const G_pt = [Gx, Gy];
+  const target = decompressPoint(TARGET_PUBKEY_HEX);
+  const WALK_U32 = WALK_SIZE / 4;  // 36 u32s per walk
+  let restarted = 0;
+
+  // Build new walk data for flagged walks
+  const patchData = new DataView(new ArrayBuffer(WALK_SIZE));
+
+  for (let i = 0; i < numWalkers; i++) {
+    const flagsOffset = i * WALK_U32 + 35;  // flags is at byte 140 = u32 index 35
+    if (data[flagsOffset] & 1) {
+      // This walk needs restart
+      const wtype = walkMetadata[i].walk_type;  // 0=tame, 1=wild
+      let pt, distVal;
+
+      if (wtype === 0) {
+        // Tame: random key in range
+        let startKey;
+        if (Math.random() < BAYES_FRACTION) {
+          startKey = posToKey(gaussianRandom(BAYES_CENTER, BAYES_STDDEV));
+        } else {
+          startKey = RANGE_LOW + randomBigInt(RANGE_SIZE);
+        }
+        pt = ecMulFast(G_pt, startKey);
+        distVal = startKey;
+      } else {
+        // Wild: random offset
+        const offset = randomBigInt(RANGE_SIZE);
+        const offsetPt = ecMulFast(G_pt, offset);
+        pt = ecAddFast(target, offsetPt);
+        distVal = offset;
+      }
+
+      const jx = toMontLimbs(pt[0]);
+      const jy = toMontLimbs(pt[1]);
+      const jz = toMontLimbs(1n);
+      const dist = bigintToLimbs(distVal);
+
+      // Pack into patch buffer
+      for (let j = 0; j < 8; j++) patchData.setUint32(j * 4, jx[j], true);
+      for (let j = 0; j < 8; j++) patchData.setUint32(32 + j * 4, jy[j], true);
+      for (let j = 0; j < 8; j++) patchData.setUint32(64 + j * 4, jz[j], true);
+      for (let j = 0; j < 8; j++) patchData.setUint32(96 + j * 4, dist[j], true);
+      patchData.setUint32(128, wtype, true);  // walk_type
+      patchData.setUint32(132, 0, true);       // step_count = 0
+      patchData.setUint32(136, 0, true);       // dp_count = 0
+      patchData.setUint32(140, 0, true);       // flags = 0
+
+      device.queue.writeBuffer(walkBuffer, i * WALK_SIZE, patchData.buffer);
+      restarted++;
+    }
+  }
+
+  readBuffer.unmap();
+  readBuffer.destroy();
+
+  if (restarted > 0) {
+    restartCount += restarted;
+    log(`Restarted ${restarted} walks (total: ${restartCount})`);
+  }
+}
+
+function limbsToHex(limbs) {
+  let hex = '';
+  for (let i = 7; i >= 0; i--) {
+    hex += limbs[i].toString(16).padStart(8, '0');
+  }
+  return hex;
+}
+
+// ═══ BROADCASTCHANNEL — Multi-tab DP sharing ═══
+const dpChannel = new BroadcastChannel('cassie-gpu-dps');
+const sigChannel = new BroadcastChannel('cassie-gpu-signal');
+const statChannel = new BroadcastChannel('cassie-gpu-stats');
+const TAB_ID = crypto.randomUUID().slice(0, 8);
+
+dpChannel.onmessage = (e) => {
+  if (e.data.tabId === TAB_ID) return; // ignore own DPs
+  processDP(e.data.x, e.data.dist, e.data.type, e.data.level, e.data.hemisphere, true);
+};
+
+sigChannel.onmessage = (e) => {
+  if (e.data.type === 'SOLVED') {
+    running = false;
+    log(`KEY FOUND BY TAB ${e.data.tabId}: ${e.data.key}`);
+  }
+};
+
+// ═══ WEBSOCKET RELAY — Cross-internet DP mesh ═══
+let relayWs = null;
+let relayPeerId = null;
+let relaySentCount = 0;
+let relayRecvCount = 0;
+let relayPeerCount = 0;
+let relayReconnectTimer = null;
+let relayUrl = '';
+
+function relayConnect(url) {
+  if (relayWs && (relayWs.readyState === WebSocket.CONNECTING || relayWs.readyState === WebSocket.OPEN)) {
+    relayDisconnect();
+  }
+  relayUrl = url;
+  log(`Relay: connecting to ${url}...`);
+  document.getElementById('relayStatus').textContent = 'Connecting...';
+  document.getElementById('relayStatus').style.color = '#b8974a';
+
+  try {
+    relayWs = new WebSocket(url);
+  } catch(e) {
+    log(`Relay: invalid URL — ${e.message}`);
+    document.getElementById('relayStatus').textContent = 'Invalid URL';
+    document.getElementById('relayStatus').style.color = '#a44';
+    return;
+  }
+
+  relayWs.onopen = () => {
+    log(`Relay: connected to ${url}`);
+    document.getElementById('relayStatus').textContent = 'Connected';
+    document.getElementById('relayStatus').style.color = '#4a4';
+    document.getElementById('btnRelay').textContent = 'Disconnect';
+    if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
+  };
+
+  relayWs.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.kind === 'welcome') {
+        relayPeerId = msg.peerId;
+        relayPeerCount = msg.activePeers;
+        document.getElementById('relayPeerId').textContent = msg.peerId;
+        document.getElementById('relayPeers').textContent = msg.activePeers;
+        log(`Relay: assigned ${msg.peerId} (${msg.activePeers} peers, ${msg.totalDPs} total DPs relayed)`);
+      } else if (msg.kind === 'dp') {
+        // Received a DP from a remote peer
+        relayRecvCount++;
+        document.getElementById('relayRecv').textContent = relayRecvCount;
+        processDP(msg.x, msg.dist, msg.type, msg.level, msg.hemisphere || 'upper', true);
+      } else if (msg.kind === 'signal') {
+        // KEY FOUND by a remote peer!
+        running = false;
+        log(`RELAY: KEY FOUND BY REMOTE PEER! key=${msg.key}`);
+        document.getElementById('collisions').textContent = 'SOLVED (REMOTE)!';
+        document.getElementById('collisions').className = 'stat-val hot';
+        // Also broadcast locally
+        sigChannel.postMessage({ type: 'SOLVED', key: msg.key, tabId: 'relay' });
+      }
+    } catch(err) { /* ignore bad messages */ }
+  };
+
+  relayWs.onclose = (e) => {
+    log(`Relay: disconnected (code ${e.code})`);
+    document.getElementById('relayStatus').textContent = 'Disconnected';
+    document.getElementById('relayStatus').style.color = '#666';
+    document.getElementById('btnRelay').textContent = 'Connect';
+    relayWs = null;
+    // Auto-reconnect after 5s if we didn't disconnect manually
+    if (relayUrl && !e.wasClean) {
+      log('Relay: reconnecting in 5s...');
+      document.getElementById('relayStatus').textContent = 'Reconnecting...';
+      document.getElementById('relayStatus').style.color = '#b8974a';
+      relayReconnectTimer = setTimeout(() => {
+        if (relayUrl) relayConnect(relayUrl);
+      }, 5000);
+    }
+  };
+
+  relayWs.onerror = () => {
+    log('Relay: connection error');
+    document.getElementById('relayStatus').textContent = 'Error';
+    document.getElementById('relayStatus').style.color = '#a44';
+  };
+}
+
+function relayDisconnect() {
+  relayUrl = '';
+  if (relayReconnectTimer) { clearTimeout(relayReconnectTimer); relayReconnectTimer = null; }
+  if (relayWs) {
+    relayWs.close(1000, 'user disconnect');
+    relayWs = null;
+  }
+  document.getElementById('relayStatus').textContent = 'Disconnected';
+  document.getElementById('relayStatus').style.color = '#666';
+  document.getElementById('btnRelay').textContent = 'Connect';
+  log('Relay: disconnected');
+}
+
+function relaySendDP(xHex, distHex, type, level, hemisphere) {
+  if (!relayWs || relayWs.readyState !== WebSocket.OPEN) return;
+  relayWs.send(JSON.stringify({
+    kind: 'dp', x: xHex, dist: distHex, type, level, hemisphere,
+  }));
+  relaySentCount++;
+  document.getElementById('relaySent').textContent = relaySentCount;
+}
+
+function relaySendSignal(key) {
+  if (!relayWs || relayWs.readyState !== WebSocket.OPEN) return;
+  relayWs.send(JSON.stringify({ kind: 'signal', key }));
+}
+
+// ═══ INDEXEDDB — Persistent DP storage ═══
+let dpDB = null;
+async function openDPStore() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('cassie-gpu-dps', 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('coarse')) db.createObjectStore('coarse');
+      if (!db.objectStoreNames.contains('fine')) db.createObjectStore('fine');
+    };
+    req.onsuccess = (e) => { dpDB = e.target.result; resolve(dpDB); };
+    req.onerror = (e) => { log('IndexedDB error: ' + e.target.error); resolve(null); };
+  });
+}
+
+async function persistDP(xHex, data, level) {
+  if (!dpDB) return;
+  try {
+    const tx = dpDB.transaction(level, 'readwrite');
+    tx.objectStore(level).put(data, xHex);
+  } catch(e) { /* non-critical */ }
+}
+
+async function loadPersistedDPs() {
+  if (!dpDB) return 0;
+  let loaded = 0;
+  for (const level of ['coarse', 'fine']) {
+    const tx = dpDB.transaction(level, 'readonly');
+    const store = tx.objectStore(level);
+    const req = store.openCursor();
+    await new Promise((resolve) => {
+      req.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const map = level === 'coarse' ? dpStore.coarse : dpStore.fine;
+          if (!map.has(cursor.key)) {
+            map.set(cursor.key, cursor.value);
+            loaded++;
+          }
+          cursor.continue();
+        } else resolve();
+      };
+      req.onerror = () => resolve();
+    });
+  }
+  return loaded;
+}
+
+// Target pubkey 02... = even y = upper hemisphere
+const TARGET_HEMISPHERE = 'upper';
+
+function processDP(xHex, distHex, type, level, hemisphere, fromRemote) {
+  // Hemisphere filter: only store DPs matching target y-parity
+  // This halves false collision candidates (free 1-bit reduction)
+  if (hemisphere && hemisphere !== TARGET_HEMISPHERE) return;
+
+  const map = level === 'coarse' ? dpStore.coarse : dpStore.fine;
+  const existing = map.get(xHex);
+  if (existing) {
+    if (existing.type !== type) {
+      crossCollisions++;
+      log(`CROSS COLLISION! x=${xHex.slice(0,24)}... ${existing.type}<->${type}`);
+      attemptKeyRecovery(existing, { type, dist: distHex });
+    } else {
+      dupTrajectories++;
+    }
+    return;
+  }
+  const dpData = { type, dist: distHex, hemisphere: hemisphere || 'unknown', ts: Date.now() };
+  map.set(xHex, dpData);
+  if (type === 'tame') dpTame++;
+  else dpWild++;
+
+  // Persist to IndexedDB
+  persistDP(xHex, dpData, level);
+
+  // Broadcast to other tabs + relay (if this DP came from our GPU, not from another tab/relay)
+  if (!fromRemote) {
+    dpChannel.postMessage({ tabId: TAB_ID, x: xHex, dist: distHex, type, level, hemisphere });
+    relaySendDP(xHex, distHex, type, level, hemisphere);
+  }
+}
+
+function attemptKeyRecovery(a, b) {
+  const tame = a.type === 'tame' ? a : b;
+  const wild = a.type === 'wild' ? a : b;
+  const tameLog = BigInt('0x' + tame.dist);
+  const wildAcc = BigInt('0x' + wild.dist);
+
+  const candidates = [
+    mod(tameLog - wildAcc, N_ORDER),
+    mod(-tameLog - wildAcc, N_ORDER),
+  ];
+
+  for (const cand of candidates) {
+    if (cand === 0n) continue;
+    const test = ecMulFast([Gx, Gy], cand);
+    if (test && test[0] === TARGET_X) {
+      const hex = cand.toString(16).padStart(34, '0');
+      log('');
+      log('='.repeat(55));
+      log('  PRIVATE KEY RECOVERED (GPU-ACCELERATED)');
+      log(`  hex: ${hex}`);
+      log(`  dec: ${cand.toString(10)}`);
+      log('='.repeat(55));
+      running = false;
+      document.getElementById('collisions').textContent = 'SOLVED!';
+      document.getElementById('collisions').className = 'stat-val hot';
+      // Broadcast to all tabs + relay
+      sigChannel.postMessage({ type: 'SOLVED', key: hex, tabId: TAB_ID });
+      relaySendSignal(hex);
+      return;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// MAIN LOOP — BATCHED DISPATCHES
+// ═══════════════════════════════════════════════════
+// Submit multiple dispatches before doing a single GPU→CPU readback.
+// This reduces synchronization overhead dramatically.
+const DISPATCHES_PER_BATCH = 8;
+
+async function mainLoop() {
+  startTime = performance.now();
+  let lastUpdate = startTime;
+
+  while (running) {
+    // Reset DP counter once before the entire batch
+    device.queue.writeBuffer(dpCountBuffer, 0, new Uint32Array([0]));
+
+    // Submit a batch of compute dispatches
+    for (let b = 0; b < DISPATCHES_PER_BATCH; b++) {
+      const commandEncoder = device.createCommandEncoder();
+      const passEncoder = commandEncoder.beginComputePass();
+      passEncoder.setPipeline(pipeline);
+      passEncoder.setBindGroup(0, bindGroup);
+      passEncoder.dispatchWorkgroups(Math.ceil(numWalkers / 64));
+      passEncoder.end();
+
+      // Only read back DPs on the last dispatch of the batch
+      if (b === DISPATCHES_PER_BATCH - 1) {
+        const counterReadBuffer = device.createBuffer({
+          size: 4,
+          usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+        });
+        commandEncoder.copyBufferToBuffer(dpCountBuffer, 0, counterReadBuffer, 0, 4);
+        device.queue.submit([commandEncoder.finish()]);
+
+        await counterReadBuffer.mapAsync(GPUMapMode.READ);
+        const dpCount = new Uint32Array(counterReadBuffer.getMappedRange())[0];
+        counterReadBuffer.unmap();
+        counterReadBuffer.destroy();
+
+        if (dpCount > 0) {
+          await readbackDPs(dpCount);
+        }
+      } else {
+        device.queue.submit([commandEncoder.finish()]);
+      }
+
+      totalOps += numWalkers * STEPS_PER_DISPATCH;
+      dispatchCount++;
+    }
+
+    // Walk restart check
+    if (dispatchCount % 4096 === 0) {
+      await handleWalkRestarts();
+    }
+
+    const now = performance.now();
+    if (now - lastUpdate > 1000) {
+      updateUI(now);
+      lastUpdate = now;
+    }
+
+    // Yield to let iGPU handle display rendering (shared GPU)
+    await new Promise(r => setTimeout(r, 16));
+  }
+}
+
+function updateUI(now) {
+  const elapsed = (now - startTime) / 1000;
+  const rate = totalOps / elapsed;
+  const rateStr = rate >= 1e6 ? `${(rate/1e6).toFixed(2)}M/s`
+    : rate >= 1e3 ? `${(rate/1e3).toFixed(1)}k/s`
+    : `${rate.toFixed(0)}/s`;
+
+  document.getElementById('opsRate').textContent = rateStr;
+  document.getElementById('totalOps').textContent = totalOps.toLocaleString();
+  document.getElementById('dispatches').textContent = dispatchCount.toLocaleString();
+  document.getElementById('coarseDPs').textContent = dpStore.coarse.size;
+  document.getElementById('fineDPs').textContent = dpStore.fine.size;
+  document.getElementById('twRatio').textContent = `${dpTame} / ${dpWild}`;
+  document.getElementById('collisions').textContent = crossCollisions;
+  document.getElementById('dupTraj').textContent = dupTrajectories;
+
+  const hrs = Math.floor(elapsed / 3600);
+  const mins = Math.floor((elapsed % 3600) / 60);
+  const secs = Math.floor(elapsed % 60);
+  document.getElementById('elapsed').textContent =
+    `${hrs}h ${mins}m ${secs}s`;
+
+  // Broadcast stats to other tabs
+  statChannel.postMessage({
+    tabId: TAB_ID, rate, totalOps, elapsed,
+    coarseDPs: dpStore.coarse.size, fineDPs: dpStore.fine.size,
+    walkers: numWalkers,
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// EXPORT DPs — for cafe deployment merge
+// ═══════════════════════════════════════════════════
+function exportDPs() {
+  const allDPs = [];
+  for (const [x, dp] of dpStore.coarse) {
+    allDPs.push(JSON.stringify({ type: dp.type, x, dist: dp.dist, level: 'coarse', hemisphere: dp.hemisphere || 'unknown', ts: dp.ts || 0 }));
+  }
+  for (const [x, dp] of dpStore.fine) {
+    allDPs.push(JSON.stringify({ type: dp.type, x, dist: dp.dist, level: 'fine', hemisphere: dp.hemisphere || 'unknown', ts: dp.ts || 0 }));
+  }
+  if (allDPs.length === 0) { log('No DPs to export'); return; }
+  const blob = new Blob([allDPs.join('\n') + '\n'], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cassie-gpu-dps-${TAB_ID}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0,19)}.ndjson`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log(`Exported ${allDPs.length} DPs (${dpStore.coarse.size} coarse + ${dpStore.fine.size} fine)`);
+}
+
+// ═══════════════════════════════════════════════════
+// IMPORT DPs — merge DPs from other machines
+// ═══════════════════════════════════════════════════
+function importDPs() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.ndjson,.json,.txt';
+  input.multiple = true;
+  input.onchange = async (e) => {
+    let imported = 0;
+    for (const file of e.target.files) {
+      const text = await file.text();
+      const lines = text.trim().split('\n');
+      for (const line of lines) {
+        try {
+          const dp = JSON.parse(line);
+          processDP(dp.x, dp.dist, dp.type, dp.level, dp.hemisphere || 'upper', true);
+          imported++;
+        } catch(err) { /* skip bad lines */ }
+      }
+    }
+    log(`Imported ${imported} DPs from ${e.target.files.length} file(s). Checking collisions...`);
+    // Re-check all cross-type pairs
+    updateUI(performance.now());
+  };
+  input.click();
+}
+
+// ═══════════════════════════════════════════════════
+// STARTUP
+// ═══════════════════════════════════════════════════
+const btnStart = document.getElementById('btnStart');
+const btnStop = document.getElementById('btnStop');
+const btnExport = document.getElementById('btnExport');
+const numWalkersInput = document.getElementById('numWalkers');
+
+btnStart.addEventListener('click', async () => {
+  numWalkers = parseInt(numWalkersInput.value) || 4096;
+  numWalkers = Math.max(64, Math.min(65536, numWalkers));
+  numWalkersInput.value = numWalkers;
+
+  btnStart.disabled = true;
+  btnStop.disabled = false;
+  numWalkersInput.disabled = true;
+
+  document.getElementById('walkerCount').textContent = numWalkers;
+
+  try {
+    log('');
+    log('  BIG CASSIE GPU — WebGPU Kangaroo Solver');
+    log('  ════════════════════════════════════════');
+    log(`  target: ${TARGET_PUBKEY_HEX}`);
+    log(`  walkers: ${numWalkers}`);
+    log(`  Bayesian: center=${BAYES_CENTER} sigma=${BAYES_STDDEV}`);
+    log('');
+
+    const jumpTable = computeJumpTable();
+    const walkData = await initWalks(numWalkers);
+    createBuffers(walkData, jumpTable);
+    await createPipeline();
+
+    log('');
+    log('GPU solver started. Dispatching compute shaders...');
+    log('');
+
+    running = true;
+    totalOps = 0;
+    dispatchCount = 0;
+    mainLoop();
+  } catch (e) {
+    showError(`Init failed: ${e.message}`);
+    log(`Stack: ${e.stack}`);
+    btnStart.disabled = false;
+    numWalkersInput.disabled = false;
+  }
+});
+
+btnStop.addEventListener('click', () => {
+  running = false;
+  btnStart.disabled = false;
+  btnStop.disabled = true;
+  numWalkersInput.disabled = false;
+  log('Solver stopped.');
+});
+
+btnExport.addEventListener('click', exportDPs);
+document.getElementById('btnImport').addEventListener('click', importDPs);
+
+// Relay connect/disconnect button
+document.getElementById('btnRelay').addEventListener('click', () => {
+  if (relayWs && relayWs.readyState === WebSocket.OPEN) {
+    relayDisconnect();
+  } else {
+    const url = document.getElementById('relayUrl').value.trim();
+    if (!url) { log('Relay: enter a WebSocket URL first (e.g. wss://your-relay.onrender.com)'); return; }
+    relayConnect(url);
+  }
+});
+
+// Also connect on Enter in the relay URL input
+document.getElementById('relayUrl').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('btnRelay').click();
+});
+
+// Init GPU on load + restore persisted DPs
+(async () => {
+  try {
+    // Open IndexedDB first — restore DPs from previous sessions
+    await openDPStore();
+    const restored = await loadPersistedDPs();
+    if (restored > 0) {
+      log(`Restored ${restored} DPs from IndexedDB (survived page reload)`);
+      // Count tame/wild from restored DPs
+      dpTame = 0; dpWild = 0;
+      for (const dp of dpStore.coarse.values()) { if (dp.type === 'tame') dpTame++; else dpWild++; }
+      for (const dp of dpStore.fine.values()) { if (dp.type === 'tame') dpTame++; else dpWild++; }
+    }
+
+    const ok = await initGPU();
+    if (ok) {
+      btnStart.disabled = false;
+      btnStart.textContent = 'Start Solver';
+      btnExport.disabled = false;
+      document.getElementById('btnImport').disabled = false;
+      log(`Tab ID: ${TAB_ID} | BroadcastChannel: active | IndexedDB: ${dpDB ? 'ready' : 'unavailable'}`);
+      log(`Hemisphere filter: ${TARGET_HEMISPHERE} (target pubkey 02 = even y)`);
+      log(`Relay mesh: enter wss:// URL above and click Connect to share DPs worldwide`);
+
+      // Auto-start if ?autostart in URL
+      if (location.search.includes('autostart')) {
+        log('Auto-starting solver...');
+        btnStart.click();
+      }
+    }
+  } catch(e) {
+    showError(`GPU init failed: ${e.message}`);
+    console.error('GPU init error:', e);
+  }
+})();
+</script>
+</body>
+</html>
