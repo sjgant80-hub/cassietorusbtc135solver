@@ -5,6 +5,13 @@
 <title>CASSIE TORUS — WebGPU Kangaroo Solver v2</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
+:root{
+  /* ◊·κ=1 — Bloom Ring Colours */
+  --r0:#660044;--r1:#00AAFF;--r2:#FFAA00;--r3:#FF4444;
+  --r4:#44AA44;--r5:#AA44FF;--r6:#FFFFFF;
+  --phi:1.618;--kappa:0.618;
+  --accent:#b8974a;--surface:#111;--border:#222;
+}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0b0a0f;color:#c4bfb2;font-family:'IBM Plex Mono',monospace;padding:20px;min-height:100vh}
 h1{color:#b8974a;font-size:1.4em;margin-bottom:4px}
@@ -123,6 +130,15 @@ h2{color:#b8974a;font-size:1em;margin:16px 0 8px;border-bottom:1px solid #222}
 
 <script type="module">
 // ═══════════════════════════════════════════════════
+// ◊·κ=1 — FALLCASSIE v2 · Seed v16.3 Compliant
+// Sovereign Compute · Pollard Kangaroo · BTC Puzzle #135
+// face(template(tag)) · Torus topology · WebGPU + WebRTC mesh
+// LAYER 2 SWARM: Ω=loop α=scout β=primary θ=sniper
+// LAYER 3 CASCADE: T0=CPU(offline) T1=WebGPU(local) T2=WebRTC(mesh)
+// LAYER 5 PERSIST: IndexedDB (sovereign, no cloud)
+// ═══════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════
 // ◊·κ=1 CONSTANTS — TORUS TOPOLOGY
 // ═══════════════════════════════════════════════════
 const P = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2Fn;
@@ -141,7 +157,9 @@ const R = 1n << 256n;
 const R_MOD_P = R % P;
 const R2_MOD_P = (R * R) % P;
 
-// Torus constants
+// ◊·κ=1 — Konomi Constants (already native to this tool)
+// PHI, KAPPA, FOLD, SPINE — these are the seed's mathematical core
+// This tool IS the seed's math made operational
 const PHI = 1.6180339887498948;
 const KAPPA = 0.6180339887498948;
 const FOLD = 510510n;
@@ -795,6 +813,15 @@ const sigChannel = new BroadcastChannel('cassie-torus-signal');
 const statChannel = new BroadcastChannel('cassie-torus-stats');
 const TAB_ID = crypto.randomUUID().slice(0,8);
 
+// ◊·κ=1 — INTEROP (Seed v16.3) — cross-tool broadcast
+const FALL_CHANNELS = {
+  signal: new BroadcastChannel('fall-signal'),
+  data:   new BroadcastChannel('fall-data')
+};
+function broadcastFallEvent(type,payload){
+  try{FALL_CHANNELS.signal.postMessage({source:'fallcassie',type,payload,ts:Date.now()})}catch(e){}
+}
+
 dpChannel.onmessage = (e) => {
   if (e.data.tabId === TAB_ID) return;
   processDP(e.data.x, e.data.dist, e.data.type, e.data.level, e.data.hemisphere, true);
@@ -1120,6 +1147,7 @@ function attemptKeyRecovery(a, b) {
       running = false;
       document.getElementById('collisions').textContent = 'SOLVED!';
       document.getElementById('collisions').className = 'stat-val hot';
+      broadcastFallEvent('key_found',{puzzle:135,key:cand.toString(16)});
       sigChannel.postMessage({ type:'SOLVED', key:hex, tabId:TAB_ID });
       meshSendSignal(hex);
       autoSplitPrize(hex);
@@ -1455,7 +1483,8 @@ document.getElementById('btnLeave').addEventListener('click', meshLeave);
       log(`Tab: ${TAB_ID} | BroadcastChannel: active | IndexedDB: ${dpDB?'ready':'off'}`);
       log(`Hemisphere: ${TARGET_HEMISPHERE} | Fold: 510,510 | θ: ${THETA_HOME}°`);
       log(`WebRTC Mesh: Create or Join a room to share DPs peer-to-peer`);
-      if (location.search.includes('autostart')) { log('Auto-starting...'); btnStart.click(); }
+      console.log('◊·κ=1 FallCassie · Torus Solver · Ψ=0.45 · seed v16.3 · LAYER 2: Ω+α+β+θ · LAYER 3: T0→T1→T2');
+    if (location.search.includes('autostart')) { log('Auto-starting...'); btnStart.click(); }
     }
   } catch(e) { showError(`Init: ${e.message}`); }
 })();

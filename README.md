@@ -144,6 +144,26 @@ The **torus fold** adds a secondary collision surface: `x mod 510510` is tracked
 
 ---
 
+## Architecture (Seed v16.3)
+
+| Layer | Implementation |
+|---|---|
+| **L1 FACE** | Stats dashboard (face), GPU kernel (template), walk parameters (tag) |
+| **L2 SWARM** | Ω=main loop, α=scout walks, β=primary walks, θ=sniper walks |
+| **L3 CASCADE** | T0=CPU fallback, T1=WebGPU (local), T2=WebRTC mesh (distributed) |
+| **L4 BLOOM** | Torus topology IS bloom — prime spine maps to search space |
+| **L5 PERSIST** | IndexedDB for DPs, NDJSON export/import |
+| **L6 SKIN** | Terminal aesthetic, gold accent, DM Mono equivalent |
+| **L7 ASS** | GPU init → walks active → DPs collecting → collision → key found |
+
+### Konomi Constants (native)
+```
+PHI = 1.618... · KAPPA = 0.618... · FOLD = 510510
+SPINE = [2,3,5,7,11,13,17] → triad decomposition
+```
+
+---
+
 ## FAQ
 
 **How long will it take?**
