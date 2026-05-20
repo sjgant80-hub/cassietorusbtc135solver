@@ -6,6 +6,16 @@ Pollard's kangaroo algorithm running on your GPU, in the browser, with no backen
 
 ---
 
+## v2 · Matryoshka — canonical build spec
+
+This repo is moving to a **single-file matryoshka solver**: one HTML that ships pre-pregnant with three nested puzzle layers. Phase 1 (135) is visible on launch. Phase 2 (136, open mesh) and Phase 3 (137, sovereign commons + FallConsensus governance) are present in the bytecode from day one and unfold automatically when each layer solves.
+
+→ **Spec:** [`CASSIE_TORUS_BUILD_CC.md`](./CASSIE_TORUS_BUILD_CC.md)
+
+The v1 files below remain the working reference for the WebGPU shaders, kangaroo math, mesh transport, and auto-split — v2 is the architecture they collapse into.
+
+---
+
 ## What this is
 
 Bitcoin Puzzle #135 is a public challenge: find the private key for a known public key within a 134-bit keyspace. The prize sits at that address — currently ~13.5 BTC.
