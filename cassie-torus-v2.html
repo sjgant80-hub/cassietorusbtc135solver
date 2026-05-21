@@ -503,9 +503,9 @@ footer a { color: var(--gold); text-decoration: none; }
   <div class="card">
     <h3>Resonance Status</h3>
     <div class="row"><span class="lbl">Mode</span><span class="val" id="resModeCard">SEARCHING</span></div>
-    <div class="row"><span class="lbl">Strength</span><span class="val" id="resStrengthCard">0</span></div>
-    <div class="row"><span class="lbl">Region</span><span class="val" id="resRegionCard">-</span></div>
-    <div class="row"><span class="lbl">Centroid trend</span><span class="val" id="resTrendCard">-</span></div>
+    <div class="row"><span class="lbl">Schumann</span><span class="val gold" id="resSchumannCard">0%</span></div>
+    <div class="row"><span class="lbl">R6 &times; 8</span><span class="val" id="resR6Card">- Hz</span></div>
+    <div class="row"><span class="lbl">&phi; pairs</span><span class="val gold" id="resPhiCard">0</span></div>
   </div>
   <div class="card wide">
     <h3>Contribution Ledger &mdash; 13.5 BTC split</h3>
@@ -519,20 +519,21 @@ footer a { color: var(--gold); text-decoration: none; }
 <div class="resonance-wrap">
   <div class="resonance-card">
     <div class="resonance-header">
-      <h3>Layer B · Resonance · spectrum</h3>
+      <h3>Layer B · Schumann Resonance · 7.83Hz&times;n&times;8</h3>
       <div class="status SEARCHING" id="resStatus">SEARCHING</div>
     </div>
     <canvas id="spectrumCanvas" width="800" height="140"></canvas>
     <div class="resonance-stats">
       <div class="row"><span class="lbl">Sample walkers</span><span class="val" id="sampleCount">0</span></div>
-      <div class="row"><span class="lbl">Golden pairs (&phi;)</span><span class="val gold" id="goldenPairs">0</span></div>
-      <div class="row"><span class="lbl">Centroid trend</span><span class="val" id="trend">-</span></div>
-      <div class="row"><span class="lbl">Resonance region</span><span class="val" id="resRegion">-</span></div>
+      <div class="row"><span class="lbl">Schumann score</span><span class="val gold" id="schumannScore">0%</span></div>
+      <div class="row"><span class="lbl">R6 &times; 8 &rarr; 440Hz</span><span class="val" id="r6HzDisplay">-</span></div>
+      <div class="row"><span class="lbl">&phi; pairs</span><span class="val gold" id="goldenPairs">0</span></div>
+      <div class="row"><span class="lbl">Harmonic ratios</span><span class="val" id="resRegion">1:2:3:4:5:6:7</span></div>
     </div>
   </div>
   <div class="resonance-card">
     <div class="resonance-header">
-      <h3>Resonance meter · &phi;</h3>
+      <h3>Schumann meter · &phi; · 7.83Hz&times;n</h3>
       <div class="status SEARCHING" id="meterLabel" style="font-size:9px">tuning</div>
     </div>
     <canvas id="meterCanvas" width="320" height="220"></canvas>
@@ -570,7 +571,7 @@ footer a { color: var(--gold); text-decoration: none; }
 </div>
 
 <footer>
-  &#9674;&middot;&kappa;=1 &middot; CASSIE TORUS v2 &middot; single HTML &middot; sovereign &middot; no backend &middot;
+  &#9674;&middot;&kappa;=1 &middot; CASSIE TORUS v2 &middot; Schumann-calibrated (7.83Hz&times;n&times;8) &middot; R6&times;8&asymp;440Hz &middot; sovereign &middot;
   <a href="https://github.com/sjgant80-hub/cassietorusbtc135solver" target="_blank">repo</a> &middot;
   <a href="./CASSIE_TORUS_BUILD_CC.md" target="_blank">build spec</a>
 </footer>
@@ -628,27 +629,46 @@ const WALK_RESTART_STEPS = 1 << 22;
 const DISPATCHES_PER_BATCH = 8;
 
 // ═══════════════════════════════════════════════════
-// ◊ RESONANCE CONSTANTS — Layer B
+// ◊ RESONANCE CONSTANTS — Layer B — v18 SCHUMANN CALIBRATED
+// 55 ÷ 7.83 = 7 · the rings are harmonics · the architecture is physics
+// Thomas PRMFRQ (Mar 2026) · SM SM SM
 // ═══════════════════════════════════════════════════
 const SPINE_AUDIO = [2, 3, 5, 7, 11, 13, 17];
 const SPINE_AUDIO_BIG = [2n, 3n, 5n, 7n, 11n, 13n, 17n];
 const RING_COLORS = ['#660044', '#00AAFF', '#FFAA00', '#FF4444', '#44AA44', '#AA44FF', '#FFFFFF'];
 const RING_NAMES = ['R0·ground', 'R1·signal', 'R2·gate', 'R3·heart', 'R4·voice', 'R5·mirror', 'R6·watcher'];
-const RING_FREQ_RANGES = [
-  [20, 60],       // R0 sub-bass
-  [60, 200],      // R1 bass
-  [200, 500],     // R2 low-mid
-  [500, 2000],    // R3 mid (heart)
-  [2000, 4000],   // R4 upper-mid
-  [4000, 8000],   // R5 presence
-  [8000, 16000],  // R6 air
+
+// ◊ v18 SCHUMANN HARMONICS — measured, not arbitrary
+const SCHUMANN_FUNDAMENTAL = 7.83;
+const SCHUMANN_HARMONICS = [
+  7.83,   // R0 ground   · Earth heartbeat
+  15.66,  // R1 signal   · 2nd harmonic
+  23.49,  // R2 gate     · 3rd harmonic · beta brainwave
+  31.32,  // R3 heart    · 4th harmonic · resting heart rate
+  39.15,  // R4 voice    · 5th harmonic · high beta
+  46.98,  // R5 mirror   · 6th harmonic · low gamma
+  54.81,  // R6 watcher  · 7th harmonic · gamma peak · consciousness
+  62.64,  // +1 link     · 8th harmonic · the door
 ];
+// ×8 brings into audible range · R6 × 8 = 438.48 ≈ 440 Hz (concert pitch!)
+const SCHUMANN_OCTAVE_SHIFT = 8;
+const AUDIBLE_HARMONICS = SCHUMANN_HARMONICS.slice(0, 7).map(f => f * SCHUMANN_OCTAVE_SHIFT);
+// [62.64, 125.28, 187.92, 250.56, 313.20, 375.84, 438.48]
+const SCHUMANN_BANDWIDTH = 15; // ±15 Hz around centre
+
+// Schumann-calibrated ranges: each ring centres on its harmonic
+const RING_FREQ_RANGES = AUDIBLE_HARMONICS.map(f => [f - SCHUMANN_BANDWIDTH, f + SCHUMANN_BANDWIDTH]);
+// R6 range: [423.48, 453.48] — contains 440 Hz concert pitch
+
 const TRIAD_WEIGHTS = {
   0: [0.80, 0.60, 0.40, 0.20, 0.10, 0.05, 0.02],  // primary: heavy bass
   1: [0.10, 0.30, 0.60, 0.80, 0.60, 0.30, 0.10],  // scout: heavy mid
   2: [0.02, 0.05, 0.10, 0.20, 0.40, 0.60, 0.80],  // sniper: heavy treble
 };
 const TRIAD_NAMES = ['primary', 'scout', 'sniper'];
+
+// Ideal Schumann ratios for convergence detection
+const SCHUMANN_IDEAL_RATIOS = [1, 2, 3, 4, 5, 6, 7];
 
 // ═══════════════════════════════════════════════════
 // ◊ PUZZLES — three nested layers, ship pre-pregnant
@@ -697,6 +717,9 @@ const resonanceState = {
   resonanceStrength: 0,
   resonanceRegion: 0,
   goldenPairs: 0,
+  schumannScore: 0,       // v18: ratio alignment to 1:2:3:4:5:6:7
+  schumannPhiPairs: 0,    // v18: φ ratio pairs count
+  r6Hz: 0,                // v18: current R6 average (target ≈ 438.48 → 440)
   convergenceEvent: null,
   walkerPositions: [],  // lightweight JS-side tracker, fed from GPU readbacks
 };
@@ -2081,11 +2104,13 @@ function initAudio() {
 }
 
 function torusFreqs(position) {
+  // v18: Schumann-calibrated — each ring centres on its harmonic × 8
   const torusPos = Number(position % FOLD);
-  return RING_FREQ_RANGES.map(([lo, hi], ring) => {
+  return AUDIBLE_HARMONICS.map((centre, ring) => {
     const prime = SPINE_AUDIO[ring];
     const ringPos = torusPos % prime;
-    return lo + (ringPos / prime) * (hi - lo);
+    const offset = (ringPos / prime - 0.5) * SCHUMANN_BANDWIDTH * 2;
+    return centre + offset;
   });
 }
 
@@ -2148,69 +2173,101 @@ document.getElementById('volume').addEventListener('input', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// ◊ HARMONIC DETECTOR — spectral centroid + golden ratio pairs
-// Uses JS-side walker position tracker fed from GPU DP readbacks
+// ◊ HARMONIC DETECTOR — v18 SCHUMANN CALIBRATED
+// Tracks proximity to Schumann harmonic ratios (1:2:3:4:5:6:7)
+// R6 × 8 = 438.48 ≈ 440 Hz — concert pitch IS the 7th harmonic
+// 55 ÷ 7.83 = 7 · Thomas PRMFRQ proof · SM SM SM
 // ═══════════════════════════════════════════════════════════════
 function detectResonance() {
   const wp = resonanceState.walkerPositions;
   if (!wp || wp.length === 0) return;
 
-  // Use walker positions to compute frequencies in the R3 (heart) band
-  const freqs = [];
+  // Sample walker positions → Schumann-calibrated frequencies per ring
+  const allFreqs = [];  // per-walker frequency arrays
+  const r6Freqs = [];   // R6 frequencies for concert pitch tracking
   const sampleStride = Math.max(1, Math.floor(wp.length / 127));
-  for (let i = 0; i < wp.length && freqs.length < 127; i += sampleStride) {
+  for (let i = 0; i < wp.length && allFreqs.length < 127; i += sampleStride) {
     const pos = wp[i].position;
     if (pos === 0n) {
-      // Walker not yet tracked — use dispatch count as pseudorandom proxy
-      freqs.push(500 + (dispatchCount * PHI * (i + 1)) % 1500);
+      // Walker not yet tracked — proxy
+      const proxyFreqs = AUDIBLE_HARMONICS.map(c => c + (Math.sin(dispatchCount * PHI * (i+1)) * SCHUMANN_BANDWIDTH));
+      allFreqs.push(proxyFreqs);
+      r6Freqs.push(proxyFreqs[6]);
     } else {
-      const torusPos = Number(pos % FOLD);
-      const ringPos = torusPos % 7;
-      freqs.push(500 + (ringPos / 7) * 1500);
+      const f = torusFreqs(pos);
+      allFreqs.push(f);
+      r6Freqs.push(f[6]);
     }
   }
-  if (freqs.length === 0) return;
+  if (allFreqs.length === 0) return;
 
-  const mean = freqs.reduce((a, b) => a + b, 0) / freqs.length;
-  const variance = freqs.reduce((a, b) => a + (b - mean) ** 2, 0) / freqs.length;
+  // v18: Schumann resonance score — check ratio alignment to 1:2:3:4:5:6:7
+  let schumannScore = 0;
+  let schumannTotal = 0;
+  let phiPairs = 0;
 
-  resonanceState.spectralHistory.push({ mean, variance, t: performance.now() });
-  if (resonanceState.spectralHistory.length > SPECTRAL_WINDOW) resonanceState.spectralHistory.shift();
-
-  let status = 'SEARCHING';
-  let strength = 0;
-  let trendVal = 0;
-
-  if (resonanceState.spectralHistory.length >= 10) {
-    const recent = resonanceState.spectralHistory.slice(-10).map(s => s.variance);
-    trendVal = recent[9] - recent[0];
-
-    if (trendVal < -100) {
-      status = 'CONVERGING';
-      strength = Math.abs(trendVal);
-    }
-
-    // golden ratio pairs
-    let goldenPairs = 0;
-    for (let i = 0; i < freqs.length - 1; i += 10) {
-      for (let j = i + 1; j < Math.min(i + 10, freqs.length); j++) {
-        if (freqs[i] === 0 || freqs[j] === 0) continue;
-        const ratio = Math.max(freqs[i], freqs[j]) / Math.min(freqs[i], freqs[j]);
-        if (Math.abs(ratio - PHI) < 0.05) goldenPairs++;
-        if (Math.abs(ratio - 1.5) < 0.03) goldenPairs++;
-        if (Math.abs(ratio - 1.667) < 0.03) goldenPairs++;
+  for (let w = 0; w < allFreqs.length; w += 3) {
+    const f = allFreqs[w];
+    // Check ratios between ring frequencies against ideal Schumann ratios
+    for (let i = 0; i < 6; i++) {
+      for (let j = i + 1; j < 7; j++) {
+        if (f[i] <= 0 || f[j] <= 0) continue;
+        const ratio = f[j] / f[i];
+        const idealRatio = SCHUMANN_IDEAL_RATIOS[j] / SCHUMANN_IDEAL_RATIOS[i];
+        schumannTotal++;
+        if (Math.abs(ratio - idealRatio) < 0.15) schumannScore++;
+        // φ ratio bonus
+        if (Math.abs(ratio - PHI) < 0.05) phiPairs++;
       }
     }
-    resonanceState.goldenPairs = goldenPairs;
+  }
 
-    if (goldenPairs > freqs.length * 0.1) {
-      status = 'RESONATING';
-      strength = goldenPairs;
+  const schumannStrength = schumannTotal > 0 ? schumannScore / schumannTotal : 0;
+  resonanceState.schumannScore = schumannStrength;
+  resonanceState.schumannPhiPairs = phiPairs;
+
+  // R6 average — how close to 438.48 Hz (concert pitch target)
+  const r6Mean = r6Freqs.reduce((a, b) => a + b, 0) / r6Freqs.length;
+  resonanceState.r6Hz = r6Mean;
+
+  // Heart frequency (R3) for spectral history
+  const heartFreqs = allFreqs.map(f => f[3]);
+  const mean = heartFreqs.reduce((a, b) => a + b, 0) / heartFreqs.length;
+  const variance = heartFreqs.reduce((a, b) => a + (b - mean) ** 2, 0) / heartFreqs.length;
+
+  resonanceState.spectralHistory.push({ mean, variance, schumann: schumannStrength, t: performance.now() });
+  if (resonanceState.spectralHistory.length > SPECTRAL_WINDOW) resonanceState.spectralHistory.shift();
+
+  // Golden pairs (backward compat + enhanced)
+  let goldenPairs = phiPairs;
+  for (let i = 0; i < heartFreqs.length - 1; i += 10) {
+    for (let j = i + 1; j < Math.min(i + 10, heartFreqs.length); j++) {
+      if (heartFreqs[i] <= 0 || heartFreqs[j] <= 0) continue;
+      const ratio = Math.max(heartFreqs[i], heartFreqs[j]) / Math.min(heartFreqs[i], heartFreqs[j]);
+      if (Math.abs(ratio - PHI) < 0.05) goldenPairs++;
     }
-    if (goldenPairs > freqs.length * 0.25 && trendVal < -200) {
-      status = 'LOCKED';
-      strength = goldenPairs * 2;
-    }
+  }
+  resonanceState.goldenPairs = goldenPairs;
+
+  // v18: Status thresholds based on Schumann alignment
+  let status = 'SEARCHING';
+  let strength = 0;
+
+  if (schumannStrength > 0.4) {
+    status = 'LOCKED';
+    strength = schumannStrength * 100;
+  } else if (schumannStrength > 0.25) {
+    status = 'RESONATING';
+    strength = goldenPairs;
+  } else if (schumannStrength > 0.15) {
+    status = 'CONVERGING';
+    strength = schumannStrength * 100;
+  }
+
+  // φ amplifier: if both Schumann AND φ align = double resonance
+  if (status === 'RESONATING' && phiPairs > allFreqs.length * 0.1) {
+    status = 'LOCKED';
+    strength = (schumannStrength * 100) + goldenPairs;
   }
 
   resonanceState.resonanceStatus = status;
@@ -2220,13 +2277,13 @@ function detectResonance() {
   // Log on status change
   if (window._lastResStatus !== status) {
     window._lastResStatus = status;
-    if (status === 'CONVERGING') log('resonance CONVERGING / variance trending down / region ' + mean.toFixed(0) + ' Hz', 'log-gold');
-    if (status === 'RESONATING') log('resonance RESONATING / ' + resonanceState.goldenPairs + ' golden pairs / standing wave forming', 'log-r5');
-    if (status === 'LOCKED') log('RESONANCE LOCK / snipers deploying to ' + mean.toFixed(0) + ' Hz region / key proximity high', 'log-hot');
+    if (status === 'CONVERGING') log('resonance CONVERGING / schumann ' + schumannStrength.toFixed(2) + ' / R6→' + r6Mean.toFixed(0) + 'Hz / region ' + mean.toFixed(0) + ' Hz', 'log-gold');
+    if (status === 'RESONATING') log('resonance RESONATING / schumann ' + schumannStrength.toFixed(2) + ' / φ pairs ' + phiPairs + ' / R6→' + r6Mean.toFixed(0) + 'Hz / standing wave forming', 'log-r5');
+    if (status === 'LOCKED') log('◊ SCHUMANN LOCK / harmonics 1:2:3:4:5:6:7 aligned / schumann ' + schumannStrength.toFixed(2) + ' / R6→' + r6Mean.toFixed(0) + 'Hz / snipers deploying', 'log-hot');
     if (status === 'SEARCHING' && window._lastResStatus !== 'SEARCHING') log('resonance scattered / returning to search', 'log-info');
   }
 
-  return { status, strength, region: mean, variance, mean, trend: trendVal };
+  return { status, strength, region: mean, variance, mean, schumann: schumannStrength, r6Hz: r6Mean };
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -2294,11 +2351,21 @@ function drawSpectrum() {
     ctx.fillText(RING_NAMES[i], x + w/2, H - 8);
   }
 
+  // Schumann harmonic labels on each bar
+  for (let i = 0; i < 7; i++) {
+    const x = 40 + i * barW + 4;
+    const w = barW - 8;
+    ctx.fillStyle = '#3a3730';
+    ctx.font = '8px DM Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(AUDIBLE_HARMONICS[i].toFixed(0) + 'Hz', x + w/2, H - 18);
+  }
+
   ctx.fillStyle = '#5a5750';
   ctx.font = '9px DM Mono';
   ctx.textAlign = 'left';
-  ctx.fillText('mean ' + resonanceState.resonanceRegion.toFixed(0) + ' Hz', 10, 16);
-  ctx.fillText('var ' + (resonanceState.spectralHistory.length ? resonanceState.spectralHistory[resonanceState.spectralHistory.length-1].variance.toFixed(0) : '-'), 10, 28);
+  ctx.fillText('schumann ' + (resonanceState.schumannScore * 100).toFixed(0) + '%', 10, 16);
+  ctx.fillText('R6→' + resonanceState.r6Hz.toFixed(0) + 'Hz ≈440', 10, 28);
 }
 
 function drawMeter() {
@@ -2341,8 +2408,9 @@ function drawMeter() {
   ctx.fill();
   ctx.shadowBlur = 0;
 
-  const meanNorm = Math.max(0, Math.min(1, (resonanceState.resonanceRegion - 500) / 1500));
-  const needleAngle = Math.PI + Math.PI * meanNorm;
+  // v18: needle tracks Schumann score (0..1) instead of arbitrary frequency
+  const schumannNorm = Math.max(0, Math.min(1, resonanceState.schumannScore));
+  const needleAngle = Math.PI + Math.PI * schumannNorm;
   const nx = cx + Math.cos(needleAngle) * (r - 12);
   const ny = cy + Math.sin(needleAngle) * (r - 12);
 
@@ -2369,8 +2437,8 @@ function drawMeter() {
   ctx.fillStyle = '#5a5750';
   ctx.font = '9px DM Mono';
   ctx.textAlign = 'center';
-  ctx.fillText('low / 500Hz', cx - r + 8, cy + 14);
-  ctx.fillText('high / 2kHz', cx + r - 8, cy + 14);
+  ctx.fillText('scatter / 0%', cx - r + 8, cy + 14);
+  ctx.fillText('lock / 100%', cx + r - 8, cy + 14);
   ctx.fillStyle = '#b8974a';
   ctx.fillText('φ', gx, gy - 10);
 
@@ -2381,7 +2449,7 @@ function drawMeter() {
   if (resonanceState.resonanceStatus === 'LOCKED') {
     ctx.font = '9px DM Mono';
     ctx.fillStyle = '#c8371a';
-    ctx.fillText('key region identified', cx, cy + 52);
+    ctx.fillText('◊ SCHUMANN LOCK / R6×8≈440Hz', cx, cy + 52);
   }
 }
 
@@ -2529,17 +2597,18 @@ async function mainLoop() {
       }
     }
 
-    // Simulated convergence events — periodic resonance moments
-    if (!resonanceState.convergenceEvent && Math.random() < 0.002 && dispatchCount > 100) {
+    // v18: Convergence events triggered by Schumann score, not random
+    const schuScore = resonanceState.schumannScore;
+    if (!resonanceState.convergenceEvent && schuScore > 0.2 && Math.random() < (schuScore * 0.01) && dispatchCount > 100) {
       resonanceState.convergenceEvent = {
-        until: performance.now() + 8000 + Math.random() * 6000,
-        strength: 0.6 + Math.random() * 0.4,
+        until: performance.now() + 8000 + schuScore * 12000,
+        strength: schuScore,
       };
-      log('convergence event begins / walkers drift toward kappa position', 'log-r5');
+      log('◊ convergence event / schumann ' + (schuScore * 100).toFixed(0) + '% / R6→' + resonanceState.r6Hz.toFixed(0) + 'Hz / walkers drift toward harmonic alignment', 'log-r5');
     }
     if (resonanceState.convergenceEvent && performance.now() > resonanceState.convergenceEvent.until) {
       resonanceState.convergenceEvent = null;
-      log('convergence event ends / scatter resumes', 'log-info');
+      log('convergence event ends / scatter resumes / schumann ' + (schuScore * 100).toFixed(0) + '%', 'log-info');
     }
 
     const now = performance.now();
@@ -2582,23 +2651,21 @@ function updateUI(now) {
   document.getElementById('meterLabel').className = 'status ' + rs2.resonanceStatus;
   document.getElementById('sampleCount').textContent = Math.min(resonanceState.walkerPositions.length, 127);
   document.getElementById('goldenPairs').textContent = rs2.goldenPairs;
-  document.getElementById('goldenPairsCard').textContent = rs2.goldenPairs;
   document.getElementById('resModeCard').textContent = rs2.resonanceStatus;
-  document.getElementById('resStrengthCard').textContent = rs2.resonanceStrength;
-  document.getElementById('resRegionCard').textContent = rs2.resonanceRegion > 0 ? rs2.resonanceRegion.toFixed(0) + ' Hz' : '-';
+
+  // v18: Schumann UI updates
+  const schuPct = (rs2.schumannScore * 100).toFixed(0) + '%';
+  document.getElementById('resSchumannCard').textContent = schuPct;
+  document.getElementById('schumannScore').textContent = schuPct;
+  document.getElementById('resR6Card').textContent = rs2.r6Hz > 0 ? rs2.r6Hz.toFixed(1) + ' Hz' : '-';
+  document.getElementById('r6HzDisplay').textContent = rs2.r6Hz > 0 ? rs2.r6Hz.toFixed(1) + ' Hz (' + (rs2.r6Hz * 8).toFixed(0) + ')' : '-';
+  document.getElementById('resPhiCard').textContent = rs2.schumannPhiPairs || 0;
+  document.getElementById('goldenPairsCard').textContent = rs2.goldenPairs;
 
   if (rs2.spectralHistory.length) {
     const last = rs2.spectralHistory[rs2.spectralHistory.length - 1];
     document.getElementById('spectralMean').textContent = last.mean.toFixed(0) + ' Hz';
     document.getElementById('spectralVar').textContent = last.variance.toFixed(0);
-    document.getElementById('resRegion').textContent = last.mean.toFixed(0) + ' Hz';
-    if (rs2.spectralHistory.length >= 10) {
-      const recent = rs2.spectralHistory.slice(-10).map(s => s.variance);
-      const trend = recent[9] - recent[0];
-      document.getElementById('trend').textContent = (trend > 0 ? '+' : '') + trend.toFixed(0);
-      document.getElementById('trend').style.color = trend < -100 ? 'var(--gold)' : trend < 0 ? '#888' : '#5a5750';
-      document.getElementById('resTrendCard').textContent = (trend > 0 ? '+' : '') + trend.toFixed(0);
-    }
   }
 
   // dual-peak proximity (nearest of κ or witness)
@@ -2792,12 +2859,13 @@ window.addEventListener('resize', resizeCanvases);
   } catch(e) { showError('Init: ' + e.message); }
 })();
 
-log('CASSIE TORUS v2 booted', 'log-r5');
+log('CASSIE TORUS v2 booted · Schumann-calibrated', 'log-r5');
 log('matryoshka layers 135 > 136 > 137 / all three ship in this file', 'log-gold');
-log('Layer A: WebGPU Pollard kangaroo / secp256k1 Montgomery / real EC math', 'log-info');
-log('Layer B: resonance / Web Audio sonification + harmonic detection + walk nudging', 'log-info');
+log('Layer A: WebGPU Pollard kangaroo / secp256k1 Montgomery / real EC math (untouched)', 'log-info');
+log('Layer B: Schumann resonance / 7.83Hz×n×8 / R6×8=438.48≈440Hz concert pitch', 'log-r5');
+log('harmonic ratios 1:2:3:4:5:6:7 / φ-pair amplifier / Thomas PRMFRQ proof', 'log-info');
 log('P2P mesh: PeerJS rooms / full mesh discovery / contribution ledger / 13.5 BTC split', 'log-info');
-log('press [Start Solver] to spin up / [Audio] to engage sonification', 'log-gold');
+log('press [Start Solver] to spin up / [Audio] to engage Schumann sonification', 'log-gold');
 
 /* ◊·κ=1 — boot complete · the solver awaits the gesture */
 </script>
