@@ -1817,6 +1817,7 @@ function attemptKeyRecovery(a, b) {
       log('', 'log-info'); log('='.repeat(55), 'log-hot');
       log('  KEY RECOVERED — TORUS SOLVER', 'log-hot');
       log('  hex: ' + hex, 'log-hot'); log('  dec: ' + cand, 'log-hot');
+      log('  1/q/c/n address derivation starting...', 'log-gold');
       log('='.repeat(55), 'log-hot');
       running = false;
       document.getElementById('collisions').textContent = 'SOLVED!';
@@ -1851,6 +1852,37 @@ function _b58chkDec(str,sha){const raw=_b58dec(str);if(raw.length<5)throw Error(
 
 function _bech32poly(v){const G=[0x3b6a57b2,0x26508e6d,0x1ea119fa,0x3d4233dd,0x2a1462b3];let c=1;for(const x of v){const b=c>>25;c=((c&0x1ffffff)<<5)^x;for(let i=0;i<5;i++)if((b>>i)&1)c^=G[i]}return c}
 function _bech32dec(str){const p=str.lastIndexOf('1');if(p<1)throw Error('no sep');const hrp=str.slice(0,p).toLowerCase(),dp=str.slice(p+1).toLowerCase();const vals=[];for(const c of dp){const v=_BECH.indexOf(c);if(v<0)throw Error('bad bech32');vals.push(v)}const hrpx=[];for(const c of hrp)hrpx.push(c.charCodeAt(0)>>5);hrpx.push(0);for(const c of hrp)hrpx.push(c.charCodeAt(0)&31);const poly=_bech32poly([...hrpx,...vals]);if(poly!==1&&poly!==0x2bc830a3)throw Error('bech32 chk');const data=vals.slice(0,-6);const wv=data[0];const prog=[];let acc=0,bits=0;for(let i=1;i<data.length;i++){acc=(acc<<5)|data[i];bits+=5;while(bits>=8){bits-=8;prog.push((acc>>bits)&0xff)}}return{witVer:wv,witProg:new Uint8Array(prog)}}
+// Bech32 ENCODE — for bc1q address generation
+function _bech32enc(hrp, witVer, witProg){
+  let data=[witVer];let acc=0,bits=0;
+  for(const b of witProg){acc=(acc<<8)|b;bits+=8;while(bits>=5){bits-=5;data.push((acc>>bits)&31)}}
+  if(bits>0)data.push((acc<<(5-bits))&31);
+  const hrpx=[];for(const c of hrp){hrpx.push(c.charCodeAt(0)>>5)}hrpx.push(0);for(const c of hrp){hrpx.push(c.charCodeAt(0)&31)}
+  const polymod=_bech32poly([...hrpx,...data,0,0,0,0,0,0])^1;
+  const chk=[];for(let i=0;i<6;i++)chk.push((polymod>>((5-i)*5))&31);
+  return hrp+'1'+[...data,...chk].map(v=>_BECH[v]).join('');
+}
+// Derive all 4 address formats from private key
+function _deriveAllAddrs(privKey, sha, rip, secp){
+  const pubC = secp.getPublicKey(privKey, true);   // compressed
+  const pubU = secp.getPublicKey(privKey, false);   // uncompressed
+  const h160c = rip(sha(pubC));                     // hash160 compressed
+  const h160u = rip(sha(pubU));                     // hash160 uncompressed
+  // 1... P2PKH compressed
+  const p2pkh_c = _b58chkEnc(_cat(new Uint8Array([0x00]), h160c), sha);
+  // 1... P2PKH uncompressed
+  const p2pkh_u = _b58chkEnc(_cat(new Uint8Array([0x00]), h160u), sha);
+  // bc1q... P2WPKH (native segwit — always compressed)
+  const p2wpkh = _bech32enc('bc', 0, h160c);
+  // 3... P2SH-P2WPKH (nested segwit — compressed)
+  const redeemScript = _cat(new Uint8Array([0x00, 0x14]), h160c);
+  const scriptHash = rip(sha(redeemScript));
+  const p2sh = _b58chkEnc(_cat(new Uint8Array([0x05]), scriptHash), sha);
+  // WIFs
+  const wifC = _b58chkEnc(_cat(new Uint8Array([0x80]), privKey, new Uint8Array([0x01])), sha);
+  const wifU = _b58chkEnc(_cat(new Uint8Array([0x80]), privKey), sha);
+  return { p2pkh_c, p2pkh_u, p2wpkh, p2sh, pubC, pubU, h160c, h160u, wifC, wifU };
+}
 
 function _addr2script(addr,sha){
   if(addr.toLowerCase().startsWith('bc1')){const{witVer,witProg}=_bech32dec(addr);if(witVer===0&&witProg.length===20)return _cat(new Uint8Array([0x00,0x14]),witProg);if(witVer===0&&witProg.length===32)return _cat(new Uint8Array([0x00,0x20]),witProg);if(witVer===1&&witProg.length===32)return _cat(new Uint8Array([0x51,0x20]),witProg);throw Error('unknown witness')}
@@ -1911,23 +1943,49 @@ async function autoSplitPrize(privateKeyHex) {
   }
 
   const privKey = _htb(privateKeyHex.padStart(64,'0'));
-  const pubKey = secp.getPublicKey(privKey, true);
-  const puzzleAddr = _b58chkEnc(_cat(new Uint8Array([0x00]),rip(sha(pubKey))),sha);
-  const wif = _b58chkEnc(_cat(new Uint8Array([0x80]),privKey,new Uint8Array([0x01])),sha);
+  const addrs = _deriveAllAddrs(privKey, sha, rip, secp);
 
-  log('Address : ' + puzzleAddr, 'log-info');
-  log('WIF     : ' + wif, 'log-info');
-  log('Pubkey  : ' + _bth(pubKey), 'log-info');
+  log('', 'log-info');
+  log('ALL ADDRESS FORMATS:', 'log-gold');
+  log('  1... P2PKH (c) : ' + addrs.p2pkh_c, 'log-info');
+  log('  1... P2PKH (u) : ' + addrs.p2pkh_u, 'log-info');
+  log('  bc1q P2WPKH    : ' + addrs.p2wpkh, 'log-info');
+  log('  3... P2SH-seg  : ' + addrs.p2sh, 'log-info');
+  log('  WIF compressed : ' + addrs.wifC, 'log-info');
+  log('  WIF uncompress : ' + addrs.wifU, 'log-info');
+  log('  Pubkey (c)     : ' + _bth(addrs.pubC), 'log-info');
+  log('  Pubkey (u)     : ' + _bth(addrs.pubU), 'log-info');
+  log('', 'log-info');
 
-  let utxos;
-  try {
-    utxos = await(await fetch('https://mempool.space/api/address/' + puzzleAddr + '/utxo')).json();
-  } catch(e) { log('UTXO fetch failed: ' + e.message + '. Import WIF manually.', 'log-hot'); return; }
-  if(!utxos||!utxos.length){ log('No UTXOs found at puzzle address. Funds may have been swept.', 'log-hot'); return; }
+  // Check UTXOs at ALL 4 address formats
+  const addrList = [
+    { label: '1...(c)', addr: addrs.p2pkh_c, type: 'p2pkh' },
+    { label: '1...(u)', addr: addrs.p2pkh_u, type: 'p2pkh' },
+    { label: 'bc1q',    addr: addrs.p2wpkh,  type: 'p2wpkh' },
+    { label: '3...',    addr: addrs.p2sh,     type: 'p2sh' },
+  ];
+  let utxos = [], fundedAddr = null, fundedType = null;
+  let pubKey = addrs.pubC;
+  for (const a of addrList) {
+    try {
+      const u = await(await fetch('https://mempool.space/api/address/' + a.addr + '/utxo')).json();
+      if (u && u.length) {
+        log('FUNDS FOUND at ' + a.label + ' : ' + a.addr, 'log-good');
+        utxos = u; fundedAddr = a.addr; fundedType = a.type;
+        if (a.type === 'p2pkh' && a.label.includes('(u)')) pubKey = addrs.pubU;
+        break;
+      } else {
+        log('  ' + a.label + ' : no UTXOs', 'log-info');
+      }
+    } catch(e) { log('  ' + a.label + ' : fetch failed', 'log-info'); }
+  }
+  if (!utxos.length) { log('No UTXOs found at any address format. Funds may have been swept.', 'log-hot'); return; }
+  const puzzleAddr = fundedAddr;
+  const wif = fundedType === 'p2pkh' && pubKey.length === 65 ? addrs.wifU : addrs.wifC;
 
   const totalSats = utxos.reduce((s,u)=>s+u.value,0);
   log('Balance : ' + (totalSats/1e8).toFixed(8) + ' BTC (' + totalSats.toLocaleString() + ' sats)', 'log-gold');
-  log('UTXOs   : ' + utxos.length, 'log-info');
+  log('UTXOs   : ' + utxos.length + ' at ' + fundedAddr, 'log-info');
 
   const contribs = [];
   if(myBtcAddr && myBtcAddr.length > 20) contribs.push({addr:myBtcAddr, dps:Math.max(dpStore.size,1)});
