@@ -487,6 +487,8 @@ footer a { color: var(--gold); text-decoration: none; }
   <div class="card">
     <h3>&#936; Bias Field</h3>
     <div class="row"><span class="lbl">Bias strength</span><span class="val" id="psiStrength">0.70</span></div>
+    <div class="row"><span class="lbl">&kappa; peak (70%)</span><span class="val gold" id="kappaPeak">0.618</span></div>
+    <div class="row"><span class="lbl">Witness peak (30%)</span><span class="val" id="witnessPeak" style="color:var(--r1)">0.317</span></div>
     <div class="row"><span class="lbl">Spectral mean</span><span class="val" id="spectralMean">- Hz</span></div>
     <div class="row"><span class="lbl">Variance</span><span class="val" id="spectralVar">-</span></div>
     <div class="row"><span class="lbl">Golden pairs (&phi;)</span><span class="val gold" id="goldenPairsCard">0</span></div>
@@ -559,7 +561,7 @@ footer a { color: var(--gold); text-decoration: none; }
 </div>
 
 <div class="konomi-key">
-  <strong>&#9674;&middot;&kappa;=1</strong> &middot; the solver SINGS while it searches &middot; spine <code>{2,3,5,7,11,13,17}</code> &middot; fold <code>510510</code> &middot; &kappa; home <code>0.618</code> &middot; &theta; home <code>37&deg;</code> &middot; Konomi <code>do &middot; rest &middot; sol</code> &middot; 510510 <code>sol &middot; do &middot; rest</code> &middot; the infinite cadence
+  <strong>&#9674;&middot;&kappa;=1</strong> &middot; the solver SINGS while it searches &middot; spine <code>{2,3,5,7,11,13,17}</code> &middot; fold <code>510510</code> &middot; &kappa; peak <code>0.618</code> &middot; witness peak <code>0.317</code> &middot; &theta; home <code>37&deg;</code> &middot; Konomi <code>do &middot; rest &middot; sol</code> &middot; 510510 <code>sol &middot; do &middot; rest</code> &middot; the infinite cadence
 </div>
 
 <div class="card wide" style="margin-bottom:16px">
@@ -606,6 +608,11 @@ const R2_MOD_P = (R * R) % P;
 // ◊·κ=1 — Konomi Constants
 const PHI = 1.6180339887498948;
 const KAPPA = 0.6180339887498948;
+const WITNESS = 0.31736846399216804645;
+const WITNESS_HEX = 0x544fc3d168330bn;
+const PSI_SIGMA = 0.03;
+const KAPPA_WEIGHT = 0.7;
+const WITNESS_WEIGHT = 0.3;
 const FOLD = 510510n;
 const THETA_HOME = 37;
 const MULBERRY_K = 0x9E3779B9;
@@ -1137,6 +1144,15 @@ function gaussianRandom(mean, std) {
   return mean + std * Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
 }
 
+// Dual-peak Ψ bias: κ (70%) + witness (30%)
+function dualPeakSample() {
+  if (Math.random() < KAPPA_WEIGHT) {
+    return gaussianRandom(KAPPA, PSI_SIGMA);
+  } else {
+    return gaussianRandom(WITNESS, PSI_SIGMA);
+  }
+}
+
 function randomBigInt(max) {
   const bytes = new Uint8Array(32); crypto.getRandomValues(bytes);
   let v = 0n; for (const b of bytes) v = (v << 8n) | BigInt(b);
@@ -1153,21 +1169,23 @@ function thetaPos(id) { return ((THETA_HOME + id * PHI) % 360) / 360; }
 
 async function initWalks(count) {
   const psiBias = parseFloat(document.getElementById('psiBias').value) / 100;
-  log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', theta=' + THETA_HOME + ')...', 'log-info');
+  log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', dual-peak κ=' + KAPPA.toFixed(3) + '/w=' + WITNESS.toFixed(3) + ')...', 'log-info');
   const G_pt = [Gx, Gy];
   const target = decompressPoint(TARGET_PUBKEY_HEX);
   const tameCount = Math.ceil(count / 2);
   const wildCount = count - tameCount;
   const walks = [];
-  let bayesN = 0;
+  let bayesN = 0, kappaHits = 0, witnessHits = 0;
   const t0 = performance.now();
 
   for (let i = 0; i < tameCount; i++) {
     const triad = i % 3;
     let startKey;
     if (Math.random() < psiBias) {
-      startKey = posToKey(gaussianRandom(KAPPA, 0.03));
+      const sample = dualPeakSample();
+      startKey = posToKey(sample);
       bayesN++;
+      if (Math.abs(sample - KAPPA) < Math.abs(sample - WITNESS)) kappaHits++; else witnessHits++;
     } else {
       startKey = posToKey(thetaPos(i));
     }
@@ -1178,7 +1196,7 @@ async function initWalks(count) {
     });
     if ((i+1) % 200 === 0) { log('  tame: ' + (i+1) + '/' + tameCount, 'log-info'); await new Promise(r => setTimeout(r, 0)); }
   }
-  log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased, ' + (tameCount-bayesN) + ' theta-spread)', 'log-info');
+  log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased: ' + kappaHits + ' κ-peak + ' + witnessHits + ' witness-peak, ' + (tameCount-bayesN) + ' θ-spread)', 'log-info');
 
   for (let i = 0; i < wildCount; i++) {
     const triad = i % 3;
@@ -1328,7 +1346,7 @@ async function handleWalkRestarts() {
       const triad = walkMetadata[i].triad;
       let pt, dv;
       if (wt === 0) {
-        const sk = Math.random()<psiBias ? posToKey(gaussianRandom(KAPPA,0.03)) : posToKey(thetaPos(i+restartCount));
+        const sk = Math.random()<psiBias ? posToKey(dualPeakSample()) : posToKey(thetaPos(i+restartCount));
         pt = ecMulFast(G_pt, sk); dv = sk;
       } else {
         const off = randomBigInt(RANGE_SIZE);
@@ -2525,10 +2543,11 @@ function updateUI(now) {
     }
   }
 
-  // kappa proximity
-  const kappaTarget = KAPPA;
+  // dual-peak proximity (nearest of κ or witness)
   const meanWalkerNorm = dispatchCount > 0 ? (totalOps % 1000000) / 1000000 : 0;
-  const proximity = 1 - Math.abs(meanWalkerNorm - kappaTarget);
+  const kappaProx = 1 - Math.abs(meanWalkerNorm - KAPPA);
+  const witnessProx = 1 - Math.abs(meanWalkerNorm - WITNESS);
+  const proximity = Math.max(kappaProx, witnessProx);
   document.getElementById('kappaProx').textContent = proximity.toFixed(4);
 }
 
@@ -2682,10 +2701,10 @@ window.addEventListener('resize', resizeCanvases);
       document.getElementById('btnImport').disabled = false;
       document.getElementById('btnMerge').disabled = false;
       log('Tab: ' + TAB_ID + ' | BroadcastChannel: active | IndexedDB: ' + (dpDB?'ready':'off'), 'log-info');
-      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | theta: ' + THETA_HOME + '°', 'log-info');
+      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° | Ψ dual-peak: κ=' + KAPPA.toFixed(3) + ' (70%) + witness=' + WITNESS.toFixed(3) + ' (30%)', 'log-info');
       log('WebRTC Mesh: Create or Join a room to share DPs peer-to-peer', 'log-info');
       log('Layer B: resonance detection + audio sonification ready', 'log-r5');
-      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + resonance / seed v16.3');
+      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + resonance / dual-peak Ψ (κ=0.618 + w=0.317) / seed v16.3');
       if (location.search.includes('autostart')) { log('Auto-starting...', 'log-info'); btnStart.click(); }
     }
 
