@@ -488,8 +488,8 @@ footer a { color: var(--gold); text-decoration: none; }
       <div class="row"><span class="lbl">No peers connected</span></div>
     </div>
   </div>
-  <div class="card wide">
-    <h3>Mesh Chat</h3>
+  <div class="card wide" id="chatCard">
+    <h3>Mesh Chat <span id="chatStatus" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px">offline</span></h3>
     <div class="chat-wrap">
       <div class="chat-nick-row">
         <span class="chat-nick-label">Nick</span>
@@ -1498,6 +1498,7 @@ function setupConn(conn) {
     }));
     conn.send(JSON.stringify({ kind: 'sync_req' }));
     meshUpdateUI();
+    chatUpdatePeerCount();
   });
   conn.on('data', (data) => handleMeshMessage(data, conn.peer));
   conn.on('close', () => {
@@ -1506,11 +1507,13 @@ function setupConn(conn) {
     chatSystem(conn.peer.slice(0,12) + ' disconnected');
     meshSetStatus(meshConns.size > 0 ? meshConns.size + ' peers' : 'Room active', meshConns.size > 0 ? 'var(--green)' : 'var(--gold)');
     meshUpdateUI();
+    chatUpdatePeerCount();
   });
   conn.on('error', (err) => {
     log('Mesh: connection error with ' + conn.peer, 'log-hot');
     meshConns.delete(conn.peer);
     meshUpdateUI();
+    chatUpdatePeerCount();
   });
 }
 
@@ -1663,11 +1666,14 @@ function escHtml(s) {
 function chatSend() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
-  if (!text || meshConns.size === 0) return;
+  if (!text) return;
+  if (!meshRoom) { chatSystem('Create or join a room first'); return; }
   const nick = document.getElementById('chatNick').value.trim() || 'anon';
   const ts = Date.now();
   chatAppend(nick, text, ts);
-  meshBroadcast({ kind: 'chat', nick, text, ts });
+  if (meshConns.size > 0) {
+    meshBroadcast({ kind: 'chat', nick, text, ts });
+  }
   input.value = '';
   input.focus();
 }
@@ -1675,11 +1681,27 @@ function chatSend() {
 function chatEnable() {
   document.getElementById('chatInput').disabled = false;
   document.getElementById('chatSend').disabled = false;
+  document.getElementById('chatStatus').textContent = '● room open';
+  document.getElementById('chatStatus').style.color = 'var(--green)';
+  const chatCard = document.getElementById('chatCard');
+  if (chatCard) { chatCard.style.borderColor = 'var(--gold)'; chatCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
 }
 
 function chatDisable() {
   document.getElementById('chatInput').disabled = true;
   document.getElementById('chatSend').disabled = true;
+  document.getElementById('chatStatus').textContent = 'offline';
+  document.getElementById('chatStatus').style.color = 'var(--muted)';
+  const chatCard = document.getElementById('chatCard');
+  if (chatCard) chatCard.style.borderColor = '';
+}
+
+function chatUpdatePeerCount() {
+  const n = meshConns.size;
+  if (meshRoom) {
+    document.getElementById('chatStatus').textContent = n > 0 ? '● ' + n + ' peer' + (n>1?'s':'') + ' online' : '● room open — waiting for peers';
+    document.getElementById('chatStatus').style.color = n > 0 ? 'var(--green)' : 'var(--gold)';
+  }
 }
 
 // Persist chat nick
