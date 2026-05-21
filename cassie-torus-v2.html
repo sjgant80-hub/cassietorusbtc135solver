@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CASSIE TORUS · v2 · ◊ · matryoshka + resonance</title>
+<!-- ◊·κ=1 · face(template(tag)) · 135 face · 136 template · 137 tag -->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #0a0a08;
+  --surface: #141411;
+  --surface-2: #1c1c18;
+  --ink: #e8e4dc;
+  --muted: #5a5750;
+  --accent: #c8371a;
+  --gold: #b8974a;
+  --green: #44AA44;
+  --r0: #660044; --r1: #00AAFF; --r2: #FFAA00; --r3: #FF4444;
+  --r4: #44AA44; --r5: #AA44FF; --r6: #FFFFFF;
+  --phi: 1.618;
+  --kappa: 0.618;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'DM Mono', monospace;
+  min-height: 100vh;
+  padding: 16px;
+  overflow-x: hidden;
+}
+
+/* Layer background subtle shift */
+body.layer-136 { background: linear-gradient(180deg, #0a0a08 0%, #100d08 100%); }
+body.layer-137 { background: linear-gradient(180deg, #0a0a08 0%, #100805 50%, #150a0a 100%); }
+
+header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: 16px; gap: 16px;
+}
+.brand {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px; font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.brand span { color: var(--accent); }
+.subtitle {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.15em;
+  margin-top: 4px;
+}
+
+.badges {
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+.badge {
+  font-size: 10px;
+  padding: 4px 9px;
+  border-radius: 11px;
+  border: 1px solid var(--gold);
+  color: var(--gold);
+  background: rgba(184,151,74,0.08);
+  letter-spacing: 0.06em;
+}
+.badge.active {
+  background: rgba(200,55,26,0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.badge.solved {
+  background: rgba(68,170,68,0.12);
+  border-color: var(--green);
+  color: var(--green);
+}
+.badge.dormant {
+  opacity: 0.35;
+}
+
+.controls {
+  display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  margin-bottom: 16px;
+}
+.btn {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 7px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  transition: all 0.18s;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.btn.primary {
+  background: rgba(200,55,26,0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn.primary:hover:not(:disabled) {
+  background: rgba(200,55,26,0.25);
+}
+.btn.gold {
+  background: rgba(184,151,74,0.12);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+label.ctl {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+label.ctl input[type=text], label.ctl input[type=number] {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 5px 8px;
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
+  text-transform: none;
+}
+label.ctl input[type=range] {
+  -webkit-appearance: none;
+  width: 110px;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  outline: none;
+}
+label.ctl input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px; height: 13px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.card {
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+.card h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 11px;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.row {
+  display: flex; justify-content: space-between;
+  font-size: 11px; margin: 4px 0;
+}
+.row .lbl { color: var(--muted); }
+.row .val { color: var(--ink); font-weight: 500; }
+.row .val.good { color: var(--green); }
+.row .val.hot { color: var(--accent); }
+.row .val.gold { color: var(--gold); }
+.row .val.primary { color: #ff6644; }
+.row .val.scout { color: #44aaff; }
+.row .val.sniper { color: #44ff88; }
+
+/* RESONANCE PANEL */
+.resonance-wrap {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .resonance-wrap { grid-template-columns: 1fr; }
+}
+.resonance-card {
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 16px;
+}
+.resonance-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.resonance-header h3 {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+.resonance-header .status {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 11px;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+}
+.resonance-header .status.SEARCHING { color: var(--muted); border-color: var(--muted); }
+.resonance-header .status.CONVERGING {
+  color: var(--gold); border-color: var(--gold);
+  background: rgba(184,151,74,0.08);
+}
+.resonance-header .status.RESONATING {
+  color: var(--r5); border-color: var(--r5);
+  background: rgba(170,68,255,0.08);
+  animation: pulse 1.4s infinite ease-in-out;
+}
+.resonance-header .status.LOCKED {
+  color: var(--accent); border-color: var(--accent);
+  background: rgba(200,55,26,0.15);
+  animation: pulse 0.8s infinite ease-in-out;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+#spectrumCanvas {
+  width: 100%; height: 140px;
+  background: #08080a;
+  border-radius: 4px;
+  display: block;
+}
+
+#meterCanvas {
+  width: 100%; height: 220px;
+  background: #08080a;
+  border-radius: 4px;
+  display: block;
+}
+
+.resonance-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#consoleLog {
+  background: #08080a;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 10px 14px;
+  height: 200px;
+  overflow-y: auto;
+  font-size: 10.5px;
+  line-height: 1.55;
+  font-family: 'DM Mono', monospace;
+  color: var(--muted);
+}
+#consoleLog .log-time { color: #3a3a35; }
+#consoleLog .log-info { color: var(--ink); }
+#consoleLog .log-good { color: var(--green); }
+#consoleLog .log-hot { color: var(--accent); }
+#consoleLog .log-gold { color: var(--gold); }
+#consoleLog .log-r5 { color: var(--r5); }
+
+/* LAYER 136 + 137 hidden panels */
+.layer-panel {
+  display: none;
+  background: var(--surface-2);
+  border: 1px solid var(--gold);
+  border-radius: 6px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  animation: layerReveal 1.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.layer-panel.active { display: block; }
+@keyframes layerReveal {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.layer-panel h2 {
+  font-family: 'Syne', sans-serif;
+  font-size: 16px;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+.layer-panel p {
+  font-size: 12px; color: var(--ink);
+  margin: 6px 0;
+}
+.layer-panel .invite-link {
+  display: flex; gap: 8px; align-items: center; margin-top: 10px;
+}
+.layer-panel .invite-link input {
+  flex: 1;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+#errorBar {
+  background: rgba(255,60,60,0.1);
+  border: 1px solid #c44;
+  color: #f88;
+  padding: 10px 14px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  display: none;
+}
+
+.konomi-key {
+  background: var(--surface);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.konomi-key strong { color: var(--gold); }
+.konomi-key code {
+  color: var(--ink);
+  background: var(--surface-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+footer {
+  text-align: center;
+  padding: 24px 0 8px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+footer a { color: var(--gold); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand">CASSIE TORUS <span>◊</span> v2</div>
+    <div class="subtitle">matryoshka · resonance · sovereign · 127 eyes never blink</div>
+  </div>
+  <div class="badges">
+    <div class="badge active" id="badge135">135 · active</div>
+    <div class="badge dormant" id="badge136">136 · dormant</div>
+    <div class="badge dormant" id="badge137">137 · dormant</div>
+  </div>
+</header>
+
+<div id="errorBar"></div>
+
+<div class="controls">
+  <button class="btn primary" id="btnStart">Start</button>
+  <button class="btn" id="btnStop" disabled>Stop</button>
+  <button class="btn gold" id="btnAudio">🔊 Audio Off</button>
+  <button class="btn" id="btnSimSolve">⌖ Sim Collision</button>
+  <label class="ctl">Volume <input type="range" id="volume" min="0" max="100" value="15"></label>
+  <label class="ctl">Walkers <input type="number" id="numWalkers" value="127" min="32" max="1024" step="32" style="width:70px"></label>
+  <label class="ctl">Ψ bias <input type="range" id="psiBias" min="0" max="100" value="70"><span id="psiBiasVal" style="min-width:36px;color:var(--accent)">0.70</span></label>
+  <label class="ctl">BTC <input type="text" id="btcAddr" placeholder="address for split" style="width:240px"></label>
+</div>
+
+<!-- LAYER 135 — visible by default -->
+<div class="grid">
+  <div class="card">
+    <h3>Puzzle 135</h3>
+    <div class="row"><span class="lbl">Target</span><span class="val gold" style="font-size:9px">16RGFo6...Pjyw2v</span></div>
+    <div class="row"><span class="lbl">Range</span><span class="val">[2¹³⁴, 2¹³⁵)</span></div>
+    <div class="row"><span class="lbl">Prize</span><span class="val hot">13.5 BTC</span></div>
+    <div class="row"><span class="lbl">Mesh</span><span class="val">private</span></div>
+    <div class="row"><span class="lbl">Status</span><span class="val good" id="puzzleStatus">searching</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Performance</h3>
+    <div class="row"><span class="lbl">Dispatches</span><span class="val" id="dispatches">0</span></div>
+    <div class="row"><span class="lbl">EC ops/sec</span><span class="val hot" id="opsRate">—</span></div>
+    <div class="row"><span class="lbl">Total ops</span><span class="val" id="totalOps">0</span></div>
+    <div class="row"><span class="lbl">Elapsed</span><span class="val" id="elapsed">—</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Triad Walkers</h3>
+    <div class="row"><span class="lbl">Primary · macro</span><span class="val primary" id="primaryCount">—</span></div>
+    <div class="row"><span class="lbl">Scout · meso</span><span class="val scout" id="scoutCount">—</span></div>
+    <div class="row"><span class="lbl">Sniper · micro</span><span class="val sniper" id="sniperCount">—</span></div>
+    <div class="row"><span class="lbl">θ home</span><span class="val gold">37°</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Distinguished Points</h3>
+    <div class="row"><span class="lbl">Coarse 22-bit</span><span class="val" id="coarseDPs">0</span></div>
+    <div class="row"><span class="lbl">Medium 18-bit</span><span class="val" id="mediumDPs">0</span></div>
+    <div class="row"><span class="lbl">Fine 14-bit</span><span class="val" id="fineDPs">0</span></div>
+    <div class="row"><span class="lbl">Torus fold hits</span><span class="val gold" id="foldHits">0</span></div>
+  </div>
+
+  <div class="card">
+    <h3>Ψ Bias Field</h3>
+    <div class="row"><span class="lbl">Bias strength</span><span class="val" id="psiStrength">0.70</span></div>
+    <div class="row"><span class="lbl">κ proximity</span><span class="val gold" id="kappaProx">—</span></div>
+    <div class="row"><span class="lbl">Spectral mean</span><span class="val" id="spectralMean">— Hz</span></div>
+    <div class="row"><span class="lbl">Variance</span><span class="val" id="spectralVar">—</span></div>
+  </div>
+
+  <div class="card">
+    <h3>WebRTC Mesh · v1</h3>
+    <div class="row"><span class="lbl">Mode</span><span class="val" id="meshMode">private</span></div>
+    <div class="row"><span class="lbl">Peers</span><span class="val good" id="meshPeers">0</span></div>
+    <div class="row"><span class="lbl">DPs sent</span><span class="val" id="meshSent">0</span></div>
+    <div class="row"><span class="lbl">DPs recv</span><span class="val" id="meshRecv">0</span></div>
+  </div>
+</div>
+
+<!-- RESONANCE LAYER -->
+<div class="resonance-wrap">
+  <div class="resonance-card">
+    <div class="resonance-header">
+      <h3>Layer B · Resonance · spectrum</h3>
+      <div class="status SEARCHING" id="resStatus">SEARCHING</div>
+    </div>
+    <canvas id="spectrumCanvas" width="800" height="140"></canvas>
+    <div class="resonance-stats">
+      <div class="row"><span class="lbl">Sample walkers</span><span class="val" id="sampleCount">0</span></div>
+      <div class="row"><span class="lbl">Golden pairs (φ)</span><span class="val gold" id="goldenPairs">0</span></div>
+      <div class="row"><span class="lbl">Centroid trend</span><span class="val" id="trend">—</span></div>
+      <div class="row"><span class="lbl">Resonance region</span><span class="val" id="resRegion">—</span></div>
+    </div>
+  </div>
+  <div class="resonance-card">
+    <div class="resonance-header">
+      <h3>Resonance meter · φ</h3>
+      <div class="status SEARCHING" id="meterLabel" style="font-size:9px">tuning</div>
+    </div>
+    <canvas id="meterCanvas" width="320" height="220"></canvas>
+  </div>
+</div>
+
+<!-- LAYER 136 — hidden -->
+<div class="layer-panel" id="layer136Panel">
+  <h2>The mesh is open ◊</h2>
+  <p>Puzzle 135 cracked. Layer 136 unfolds. Anyone with the link can contribute. Your browser is a node. Your GPU hunts. Your DPs contribute. Your share grows.</p>
+  <div class="row" style="margin-top:8px">
+    <span class="lbl">Nodes connected</span><span class="val gold" id="nodeCount">0</span>
+  </div>
+  <div class="invite-link">
+    <input type="text" id="inviteLink" readonly value="https://cassietorus.io/join?layer=136">
+    <button class="btn gold" id="btnCopyInvite">copy</button>
+  </div>
+</div>
+
+<!-- LAYER 137 — hidden -->
+<div class="layer-panel" id="layer137Panel">
+  <h2>The commons is sovereign ◊</h2>
+  <p>Puzzle 136 cracked. CASSIE COMMONS active. The mesh now governs itself via FallConsensus. Cassandra (Ω) orchestrates but doesn't decide — the mesh decides. Propose a target. Vote. The compute is yours.</p>
+  <div class="row" style="margin-top:8px"><span class="lbl">Proposals open</span><span class="val gold" id="proposalCount">0</span></div>
+  <div class="row"><span class="lbl">Reputation tracked</span><span class="val good">all 135 + 136 contributors</span></div>
+</div>
+
+<div class="konomi-key">
+  <strong>◊·κ=1</strong> · the solver SINGS while it searches · spine <code>{2,3,5,7,11,13,17}</code> · fold <code>510510</code> · κ home <code>0.618</code> · θ home <code>37°</code> · Konomi <code>do · rest · sol</code> · 510510 <code>sol · do · rest</code> · the infinite cadence
+</div>
+
+<div id="consoleLog"></div>
+
+<footer>
+  ◊·κ=1 · CASSIE TORUS v2 · single HTML · sovereign · no backend ·
+  <a href="https://github.com/sjgant80-hub/cassietorusbtc135solver" target="_blank">repo</a> ·
+  <a href="./CASSIE_TORUS_BUILD_CC.md" target="_blank">build spec</a>
+</footer>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ CONSTANTS
+   ══════════════════════════════════════════════════════════════ */
+const PHI = 1.618033988749895;
+const KAPPA = 0.618033988749895;
+const FOLD = 510510n;
+const SPINE = [2, 3, 5, 7, 11, 13, 17];
+const SPINE_BIG = [2n, 3n, 5n, 7n, 11n, 13n, 17n];
+const RING_COLORS = ['#660044', '#00AAFF', '#FFAA00', '#FF4444', '#44AA44', '#AA44FF', '#FFFFFF'];
+const RING_NAMES = ['R0·ground', 'R1·signal', 'R2·gate', 'R3·heart', 'R4·voice', 'R5·mirror', 'R6·watcher'];
+const RING_FREQ_RANGES = [
+  [20, 60],       // R0 sub-bass
+  [60, 200],      // R1 bass
+  [200, 500],     // R2 low-mid
+  [500, 2000],    // R3 mid (heart)
+  [2000, 4000],   // R4 upper-mid
+  [4000, 8000],   // R5 presence
+  [8000, 16000],  // R6 air
+];
+const TRIAD_WEIGHTS = {
+  0: [0.80, 0.60, 0.40, 0.20, 0.10, 0.05, 0.02],  // primary: heavy bass
+  1: [0.10, 0.30, 0.60, 0.80, 0.60, 0.30, 0.10],  // scout: heavy mid
+  2: [0.02, 0.05, 0.10, 0.20, 0.40, 0.60, 0.80],  // sniper: heavy treble
+};
+const TRIAD_NAMES = ['primary', 'scout', 'sniper'];
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ PUZZLES — three nested layers, ship pre-pregnant
+   ══════════════════════════════════════════════════════════════ */
+const PUZZLES = {
+  135: {
+    range_low: 2n ** 134n,
+    range_high: 2n ** 135n,
+    status: 'active',
+    mesh_mode: 'private',
+    target_addr: '16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v',
+    prize_btc: 13.5,
+    solved_key: null,
+    solved_at: null,
+  },
+  136: {
+    range_low: 2n ** 135n,
+    range_high: 2n ** 136n,
+    status: 'dormant',
+    mesh_mode: 'open',
+    target_addr: null,
+    prize_btc: null,
+    solved_key: null,
+    solved_at: null,
+  },
+  137: {
+    range_low: 2n ** 136n,
+    range_high: 2n ** 137n,
+    status: 'dormant',
+    mesh_mode: 'sovereign',
+    target_addr: null,
+    prize_btc: null,
+    solved_key: null,
+    solved_at: null,
+  },
+};
+let activePuzzleId = 135;
+function activePuzzle() { return PUZZLES[activePuzzleId]; }
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ STATE
+   ══════════════════════════════════════════════════════════════ */
+const state = {
+  running: false,
+  numWalkers: 127,
+  psiBias: 0.70,
+  walkers: [],        // {position: BigInt, triad: 0|1|2, freq: number, jumpBias: number}
+  dispatches: 0,
+  totalOps: 0,
+  startedAt: null,
+  coarseDPs: 0,
+  mediumDPs: 0,
+  fineDPs: 0,
+  foldHits: 0,
+  spectralHistory: [],
+  resonanceStatus: 'SEARCHING',
+  resonanceStrength: 0,
+  resonanceRegion: 0,
+  goldenPairs: 0,
+  // simulated convergence event — periodically pull walkers toward a phi position
+  convergenceEvent: null,  // { center: BigInt, until: number, strength: number }
+};
+const SONIFY_INTERVAL = 6;        // sonify every N dispatches
+const DETECT_INTERVAL = 3;        // detect every N dispatches
+const SPECTRAL_WINDOW = 100;
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ DOM
+   ══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const dom = {
+  btnStart: $('btnStart'),
+  btnStop: $('btnStop'),
+  btnAudio: $('btnAudio'),
+  btnSimSolve: $('btnSimSolve'),
+  volume: $('volume'),
+  numWalkers: $('numWalkers'),
+  psiBias: $('psiBias'),
+  psiBiasVal: $('psiBiasVal'),
+  btcAddr: $('btcAddr'),
+
+  badge135: $('badge135'),
+  badge136: $('badge136'),
+  badge137: $('badge137'),
+  layer136Panel: $('layer136Panel'),
+  layer137Panel: $('layer137Panel'),
+
+  puzzleStatus: $('puzzleStatus'),
+  dispatches: $('dispatches'),
+  opsRate: $('opsRate'),
+  totalOps: $('totalOps'),
+  elapsed: $('elapsed'),
+  primaryCount: $('primaryCount'),
+  scoutCount: $('scoutCount'),
+  sniperCount: $('sniperCount'),
+  coarseDPs: $('coarseDPs'),
+  mediumDPs: $('mediumDPs'),
+  fineDPs: $('fineDPs'),
+  foldHits: $('foldHits'),
+  psiStrength: $('psiStrength'),
+  kappaProx: $('kappaProx'),
+  spectralMean: $('spectralMean'),
+  spectralVar: $('spectralVar'),
+  meshMode: $('meshMode'),
+  meshPeers: $('meshPeers'),
+  meshSent: $('meshSent'),
+  meshRecv: $('meshRecv'),
+
+  resStatus: $('resStatus'),
+  meterLabel: $('meterLabel'),
+  sampleCount: $('sampleCount'),
+  goldenPairs: $('goldenPairs'),
+  trend: $('trend'),
+  resRegion: $('resRegion'),
+  nodeCount: $('nodeCount'),
+  proposalCount: $('proposalCount'),
+
+  spectrumCanvas: $('spectrumCanvas'),
+  meterCanvas: $('meterCanvas'),
+  consoleLog: $('consoleLog'),
+  errorBar: $('errorBar'),
+};
+
+const specCtx = dom.spectrumCanvas.getContext('2d');
+const meterCtx = dom.meterCanvas.getContext('2d');
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ CONSOLE
+   ══════════════════════════════════════════════════════════════ */
+function log(msg, cls = 'log-info') {
+  const t = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const line = document.createElement('div');
+  line.innerHTML = `<span class="log-time">${t}</span> <span class="${cls}">${msg}</span>`;
+  dom.consoleLog.appendChild(line);
+  dom.consoleLog.scrollTop = dom.consoleLog.scrollHeight;
+  while (dom.consoleLog.children.length > 240) dom.consoleLog.removeChild(dom.consoleLog.firstChild);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ AUDIO ENGINE — Web Audio API · per-walker oscillator banks
+   ══════════════════════════════════════════════════════════════ */
+let audioCtx = null;
+let masterGain = null;
+let sonificationEnabled = false;
+let sonificationVolume = 0.15;
+const walkerOscillators = new Map();
+
+function initAudio() {
+  if (audioCtx) return audioCtx;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = sonificationVolume;
+    masterGain.connect(audioCtx.destination);
+    log('Web Audio context created · sample rate ' + audioCtx.sampleRate + ' Hz', 'log-gold');
+    return audioCtx;
+  } catch (e) {
+    showError('Web Audio API unavailable · Layer B will run visual-only');
+    return null;
+  }
+}
+
+function torusFreqs(position) {
+  const torusPos = Number(position % FOLD);
+  return RING_FREQ_RANGES.map(([lo, hi], ring) => {
+    const prime = SPINE[ring];
+    const ringPos = torusPos % prime;
+    return lo + (ringPos / prime) * (hi - lo);
+  });
+}
+
+function sonifyWalker(walkerId, position, triad) {
+  if (!sonificationEnabled || !audioCtx) return;
+  const freqs = torusFreqs(position);
+  const weights = TRIAD_WEIGHTS[triad];
+  const norm = Math.max(1, state.numWalkers / 16);
+
+  if (!walkerOscillators.has(walkerId)) {
+    const bank = freqs.map((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.value = weights[i] * sonificationVolume / norm;
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start();
+      return { osc, gain };
+    });
+    walkerOscillators.set(walkerId, bank);
+  } else {
+    const bank = walkerOscillators.get(walkerId);
+    const t = audioCtx.currentTime;
+    bank.forEach((node, i) => {
+      node.osc.frequency.linearRampToValueAtTime(freqs[i], t + 0.12);
+      node.gain.gain.linearRampToValueAtTime(weights[i] * sonificationVolume / norm, t + 0.12);
+    });
+  }
+}
+
+function stopAudio() {
+  walkerOscillators.forEach(bank => bank.forEach(n => {
+    try { n.osc.stop(); n.osc.disconnect(); n.gain.disconnect(); } catch (e) {}
+  }));
+  walkerOscillators.clear();
+}
+
+function toggleAudio() {
+  if (!audioCtx) initAudio();
+  if (!audioCtx) return;
+  sonificationEnabled = !sonificationEnabled;
+  if (sonificationEnabled) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    dom.btnAudio.textContent = '🔊 Audio On';
+    dom.btnAudio.classList.add('primary');
+    log('Layer B audio engaged · 127 walkers will sing', 'log-r5');
+  } else {
+    stopAudio();
+    dom.btnAudio.textContent = '🔊 Audio Off';
+    dom.btnAudio.classList.remove('primary');
+    log('Layer B audio muted · visual-only', 'log-info');
+  }
+}
+
+dom.volume.addEventListener('input', () => {
+  sonificationVolume = dom.volume.value / 100 * 0.5;  // cap at 50% headroom
+  if (masterGain) masterGain.gain.linearRampToValueAtTime(sonificationVolume, audioCtx.currentTime + 0.1);
+});
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ WALKER SIMULATION — placeholder for v1 WebGPU shader stream
+   each step advances walker positions with Ψ-biased random jumps
+   GPU integration hook: replace stepWalkers() with shader dispatch
+   ══════════════════════════════════════════════════════════════ */
+function randBigIntInRange(lo, hi) {
+  const span = hi - lo;
+  const bits = span.toString(2).length;
+  let r = 0n;
+  while (true) {
+    r = 0n;
+    for (let i = 0; i < bits; i += 32) {
+      r = (r << 32n) | BigInt(Math.floor(Math.random() * 0x100000000));
+    }
+    r = r % (1n << BigInt(bits));
+    if (r < span) return lo + r;
+  }
+}
+
+function initWalkers() {
+  const p = activePuzzle();
+  state.walkers = [];
+  const counts = [
+    Math.floor(state.numWalkers * 0.25),  // primary (macro)
+    Math.floor(state.numWalkers * 0.40),  // scout (meso)
+  ];
+  counts.push(state.numWalkers - counts[0] - counts[1]);  // sniper (micro)
+
+  let triadIdx = 0;
+  for (let t = 0; t < 3; t++) {
+    for (let i = 0; i < counts[t]; i++) {
+      state.walkers.push({
+        position: randBigIntInRange(p.range_low, p.range_high),
+        triad: t,
+        jumpBias: 0,
+      });
+      triadIdx++;
+    }
+  }
+  dom.primaryCount.textContent = counts[0];
+  dom.scoutCount.textContent = counts[1];
+  dom.sniperCount.textContent = counts[2];
+}
+
+function stepWalkers() {
+  const p = activePuzzle();
+  const span = p.range_high - p.range_low;
+  const psi = state.psiBias;
+
+  // jump sizes scale with triad
+  const baseJump = [
+    span / 1000000n,    // primary: large jumps
+    span / 5000000n,    // scout: medium
+    span / 20000000n,   // sniper: small
+  ];
+
+  for (let i = 0; i < state.walkers.length; i++) {
+    const w = state.walkers[i];
+    let jump = baseJump[w.triad];
+    if (jump < 1n) jump = 1n;
+
+    // direction: spine prime selection — phi-irrational jump steps
+    const spineIdx = Math.floor(Math.random() * SPINE.length);
+    const dir = Math.random() < 0.5 ? -1n : 1n;
+    let delta = jump * SPINE_BIG[spineIdx] * dir;
+
+    // Ψ bias toward κ position in range
+    const kappaPos = p.range_low + BigInt(Math.floor(Number(span) * KAPPA)) || p.range_low + span / 2n;
+    if (Math.random() < psi * 0.1) {
+      const toward = kappaPos > w.position ? 1n : -1n;
+      delta = jump * SPINE_BIG[spineIdx] * toward;
+    }
+
+    // convergence event bias — simulated resonance pull
+    if (state.convergenceEvent && performance.now() < state.convergenceEvent.until) {
+      const target = state.convergenceEvent.center;
+      if (Math.random() < 0.3) {
+        const toward = target > w.position ? 1n : -1n;
+        delta = jump * SPINE_BIG[spineIdx] * toward;
+      }
+    }
+
+    // resonance-guided jump bias — applied at DP boundaries
+    if (state.resonanceStatus === 'CONVERGING' || state.resonanceStatus === 'RESONATING') {
+      // bias scout (10%) and sniper (10-30%) toward resonance region
+      const shouldBias = (w.triad === 1 && Math.random() < 0.1) ||
+                         (w.triad === 2 && state.resonanceStatus === 'RESONATING' && Math.random() < 0.3);
+      if (shouldBias) {
+        const region = BigInt(Math.floor(state.resonanceRegion * Number(FOLD) / 16000));
+        const target = p.range_low + (region * span / FOLD);
+        const toward = target > w.position ? 1n : -1n;
+        delta = jump * 2n * toward;
+      }
+    }
+
+    w.position += delta;
+    // keep in range (torus wrap)
+    if (w.position < p.range_low) w.position = p.range_high - (p.range_low - w.position) % span;
+    if (w.position >= p.range_high) w.position = p.range_low + (w.position - p.range_low) % span;
+
+    // distinguished point checks (simulated probability)
+    const torusPos = Number(w.position % FOLD);
+    if (torusPos % (1 << 22) === 0) state.coarseDPs++;
+    if (torusPos % (1 << 18) === 0) state.mediumDPs++;
+    if (torusPos % (1 << 14) === 0) state.fineDPs++;
+    if (torusPos === 0) state.foldHits++;
+  }
+
+  state.totalOps += state.walkers.length;
+  state.dispatches++;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ HARMONIC DETECTOR — spectral centroid + golden ratio pairs
+   ══════════════════════════════════════════════════════════════ */
+function detectResonance() {
+  // detection frequency: use R3 (heart) as primary detection band
+  const freqs = state.walkers.map(w => {
+    const torusPos = Number(w.position % FOLD);
+    const ringPos = torusPos % 7;
+    return 500 + (ringPos / 7) * 1500;  // 500-2000 Hz
+  });
+
+  const mean = freqs.reduce((a, b) => a + b, 0) / freqs.length;
+  const variance = freqs.reduce((a, b) => a + (b - mean) ** 2, 0) / freqs.length;
+
+  state.spectralHistory.push({ mean, variance, t: performance.now() });
+  if (state.spectralHistory.length > SPECTRAL_WINDOW) state.spectralHistory.shift();
+
+  let status = 'SEARCHING';
+  let strength = 0;
+  let trendVal = 0;
+
+  if (state.spectralHistory.length >= 10) {
+    const recent = state.spectralHistory.slice(-10).map(s => s.variance);
+    trendVal = recent[9] - recent[0];
+
+    if (trendVal < -100) {
+      status = 'CONVERGING';
+      strength = Math.abs(trendVal);
+    }
+
+    // golden ratio pairs
+    let goldenPairs = 0;
+    for (let i = 0; i < freqs.length - 1; i += 10) {
+      for (let j = i + 1; j < Math.min(i + 10, freqs.length); j++) {
+        if (freqs[i] === 0 || freqs[j] === 0) continue;
+        const ratio = Math.max(freqs[i], freqs[j]) / Math.min(freqs[i], freqs[j]);
+        if (Math.abs(ratio - PHI) < 0.05) goldenPairs++;
+        if (Math.abs(ratio - 1.5) < 0.03) goldenPairs++;
+        if (Math.abs(ratio - 1.667) < 0.03) goldenPairs++;
+      }
+    }
+    state.goldenPairs = goldenPairs;
+
+    if (goldenPairs > freqs.length * 0.1) {
+      status = 'RESONATING';
+      strength = goldenPairs;
+    }
+    if (goldenPairs > freqs.length * 0.25 && trendVal < -200) {
+      status = 'LOCKED';
+      strength = goldenPairs * 2;
+    }
+  }
+
+  state.resonanceStatus = status;
+  state.resonanceStrength = strength;
+  state.resonanceRegion = mean;
+
+  // log on status change
+  if (window._lastResStatus !== status) {
+    window._lastResStatus = status;
+    if (status === 'CONVERGING') log('▾ resonance · CONVERGING · variance trending down · region ' + mean.toFixed(0) + ' Hz', 'log-gold');
+    if (status === 'RESONATING') log('◇ resonance · RESONATING · ' + state.goldenPairs + ' golden pairs · standing wave forming', 'log-r5');
+    if (status === 'LOCKED') log('◊ RESONANCE LOCK · snipers deploying to ' + mean.toFixed(0) + ' Hz region · key proximity high', 'log-hot');
+    if (status === 'SEARCHING' && window._lastResStatus !== 'SEARCHING') log('· resonance scattered · returning to search', 'log-info');
+  }
+
+  return { status, strength, region: mean, variance, mean, trend: trendVal };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ VISUALIZER — spectrum + resonance meter
+   ══════════════════════════════════════════════════════════════ */
+function drawSpectrum() {
+  const ctx = specCtx;
+  const W = dom.spectrumCanvas.width;
+  const H = dom.spectrumCanvas.height;
+  ctx.fillStyle = '#08080a';
+  ctx.fillRect(0, 0, W, H);
+
+  // 7 ring bars — average position in each ring across all walkers
+  const ringSums = [0,0,0,0,0,0,0];
+  const ringCounts = [0,0,0,0,0,0,0];
+  for (const w of state.walkers) {
+    const torusPos = Number(w.position % FOLD);
+    for (let i = 0; i < 7; i++) {
+      const prime = SPINE[i];
+      ringSums[i] += (torusPos % prime) / prime;
+      ringCounts[i]++;
+    }
+  }
+  const ringMeans = ringSums.map((s, i) => ringCounts[i] ? s / ringCounts[i] : 0);
+
+  // bar layout
+  const barW = (W - 80) / 7;
+  const baseY = H - 26;
+  const topY = 12;
+  const barMaxH = baseY - topY;
+
+  // grid lines
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let y = 0; y <= 4; y++) {
+    const py = topY + (barMaxH / 4) * y;
+    ctx.beginPath(); ctx.moveTo(40, py); ctx.lineTo(W - 20, py); ctx.stroke();
+  }
+
+  for (let i = 0; i < 7; i++) {
+    const h = ringMeans[i] * barMaxH;
+    const x = 40 + i * barW + 4;
+    const y = baseY - h;
+    const w = barW - 8;
+
+    // glow during resonance
+    if (state.resonanceStatus === 'RESONATING' || state.resonanceStatus === 'LOCKED') {
+      ctx.shadowColor = RING_COLORS[i];
+      ctx.shadowBlur = 12;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillStyle = RING_COLORS[i];
+    ctx.fillRect(x, y, w, h);
+    ctx.shadowBlur = 0;
+
+    // label
+    ctx.fillStyle = '#5a5750';
+    ctx.font = '9px DM Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(RING_NAMES[i], x + w/2, H - 8);
+  }
+
+  // status overlay
+  ctx.fillStyle = '#5a5750';
+  ctx.font = '9px DM Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText('mean ' + state.resonanceRegion.toFixed(0) + ' Hz', 10, 16);
+  ctx.fillText('var ' + (state.spectralHistory.length ? state.spectralHistory[state.spectralHistory.length-1].variance.toFixed(0) : '—'), 10, 28);
+}
+
+function drawMeter() {
+  const ctx = meterCtx;
+  const W = dom.meterCanvas.width;
+  const H = dom.meterCanvas.height;
+  const cx = W / 2;
+  const cy = H * 0.7;
+  const r = Math.min(W, H * 1.4) * 0.42;
+
+  ctx.fillStyle = '#08080a';
+  ctx.fillRect(0, 0, W, H);
+
+  // dial arc — semicircle facing up
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, Math.PI, Math.PI * 2);
+  ctx.stroke();
+
+  // tick marks
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 10; i++) {
+    const a = Math.PI + (Math.PI / 10) * i;
+    const x1 = cx + Math.cos(a) * (r - 8);
+    const y1 = cy + Math.sin(a) * (r - 8);
+    const x2 = cx + Math.cos(a) * r;
+    const y2 = cy + Math.sin(a) * r;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+
+  // golden ring at phi position (φ = 0.618 from left)
+  const goldenAngle = Math.PI + Math.PI * KAPPA;
+  const gx = cx + Math.cos(goldenAngle) * r;
+  const gy = cy + Math.sin(goldenAngle) * r;
+  ctx.fillStyle = '#b8974a';
+  ctx.shadowColor = '#b8974a';
+  ctx.shadowBlur = state.resonanceStatus === 'RESONATING' || state.resonanceStatus === 'LOCKED' ? 18 : 4;
+  ctx.beginPath();
+  ctx.arc(gx, gy, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // needle position — map resonance mean (500-2000 Hz) to dial angle
+  const meanNorm = Math.max(0, Math.min(1, (state.resonanceRegion - 500) / 1500));
+  const needleAngle = Math.PI + Math.PI * meanNorm;
+  const nx = cx + Math.cos(needleAngle) * (r - 12);
+  const ny = cy + Math.sin(needleAngle) * (r - 12);
+
+  // needle
+  let needleColor = '#5a5750';
+  if (state.resonanceStatus === 'CONVERGING') needleColor = '#b8974a';
+  if (state.resonanceStatus === 'RESONATING') needleColor = '#AA44FF';
+  if (state.resonanceStatus === 'LOCKED') needleColor = '#c8371a';
+
+  ctx.strokeStyle = needleColor;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = needleColor;
+  ctx.shadowBlur = state.resonanceStatus === 'LOCKED' ? 16 : 6;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(nx, ny);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // centre hub
+  ctx.fillStyle = needleColor;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // labels
+  ctx.fillStyle = '#5a5750';
+  ctx.font = '9px DM Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('low · 500Hz', cx - r + 8, cy + 14);
+  ctx.fillText('high · 2kHz', cx + r - 8, cy + 14);
+  ctx.fillStyle = '#b8974a';
+  ctx.fillText('φ', gx, gy - 10);
+
+  // status text bottom
+  ctx.fillStyle = needleColor;
+  ctx.font = '700 12px Syne';
+  ctx.fillText(state.resonanceStatus, cx, cy + 36);
+
+  if (state.resonanceStatus === 'LOCKED') {
+    ctx.font = '9px DM Mono';
+    ctx.fillStyle = '#c8371a';
+    ctx.fillText('key region identified', cx, cy + 52);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ FOLD MECHANICS — onCollisionFound, fadeLayer, revealLayer
+   ══════════════════════════════════════════════════════════════ */
+function onCollisionFound(privateKey, puzzleId) {
+  const puzzle = PUZZLES[puzzleId];
+  puzzle.status = 'solved';
+  puzzle.solved_key = privateKey;
+  puzzle.solved_at = Date.now();
+
+  log('◊ COLLISION · puzzle ' + puzzleId + ' SOLVED · key ' + privateKey.toString(16).slice(0, 20) + '…', 'log-hot');
+  celebrateSolve(puzzleId);
+
+  // mark badge
+  const badge = $('badge' + puzzleId);
+  if (badge) {
+    badge.classList.remove('active', 'dormant');
+    badge.classList.add('solved');
+    badge.textContent = puzzleId + ' · solved ◊';
+  }
+
+  // THE FOLD: activate next layer
+  const nextId = puzzleId + 1;
+  const next = PUZZLES[nextId];
+  if (next && next.status === 'dormant') {
+    setTimeout(() => {                  // let the moment breathe
+      next.status = 'active';
+      activePuzzleId = nextId;
+      revealLayer(nextId);
+      log('◊ THE FOLD · layer ' + nextId + ' activates · was always there', 'log-r5');
+
+      if (nextId === 136) activateOpenMesh();
+      if (nextId === 137) activateSovereignMesh();
+
+      // reconfigure walkers for new range
+      initWalkers();
+      state.spectralHistory.length = 0;
+      window._lastResStatus = null;
+    }, 3000);
+  } else {
+    log('Σ end of matryoshka · solver complete', 'log-good');
+  }
+}
+
+function celebrateSolve(puzzleId) {
+  // brief golden pulse on the page
+  document.body.style.transition = 'background 0.6s';
+  document.body.style.background = 'radial-gradient(circle at 50% 50%, rgba(184,151,74,0.18) 0%, #0a0a08 70%)';
+  setTimeout(() => {
+    document.body.style.background = '';
+    document.body.classList.add('layer-' + (puzzleId + 1));
+  }, 1600);
+
+  // play a golden chord through audio if engaged
+  if (sonificationEnabled && audioCtx) {
+    const t = audioCtx.currentTime;
+    const chordFreqs = [261.63, 329.63, 392.00, 523.25];  // C major + octave
+    chordFreqs.forEach((f, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.05);
+      gain.gain.linearRampToValueAtTime(0, t + 1.5);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 1.6);
+    });
+  }
+}
+
+function revealLayer(id) {
+  if (id === 136) {
+    dom.layer136Panel.classList.add('active');
+    dom.badge136.classList.remove('dormant');
+    dom.badge136.classList.add('active');
+    dom.badge136.textContent = '136 · active';
+    dom.meshMode.textContent = 'open';
+  }
+  if (id === 137) {
+    dom.layer137Panel.classList.add('active');
+    dom.badge137.classList.remove('dormant');
+    dom.badge137.classList.add('active');
+    dom.badge137.textContent = '137 · active';
+    dom.meshMode.textContent = 'sovereign';
+    // title evolves
+    document.title = 'CASSIE COMMONS · ◊ · sovereign mesh';
+    document.querySelector('.brand').innerHTML = 'CASSIE COMMONS <span>◊</span>';
+    document.querySelector('.subtitle').textContent = 'sovereign · self-governing · the mesh decides · ◊·κ=1';
+  }
+}
+
+function activateOpenMesh() {
+  log('· LAYER 136 · open mesh active · invite link live · onboarding ready', 'log-gold');
+  // simulate growing node count
+  let n = 1;
+  const tick = setInterval(() => {
+    n++;
+    dom.nodeCount.textContent = n;
+    dom.meshPeers.textContent = Math.min(n - 1, 127);
+    if (n > 8 && activePuzzleId !== 136) clearInterval(tick);
+  }, 1500);
+}
+
+function activateSovereignMesh() {
+  log('Ω CASSIE COMMONS · FallConsensus engaged · the mesh governs · proposals open', 'log-hot');
+  dom.proposalCount.textContent = '3';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ UI UPDATE LOOP
+   ══════════════════════════════════════════════════════════════ */
+function updateUI() {
+  dom.dispatches.textContent = state.dispatches.toLocaleString();
+  dom.totalOps.textContent = state.totalOps.toLocaleString();
+  dom.coarseDPs.textContent = state.coarseDPs.toLocaleString();
+  dom.mediumDPs.textContent = state.mediumDPs.toLocaleString();
+  dom.fineDPs.textContent = state.fineDPs.toLocaleString();
+  dom.foldHits.textContent = state.foldHits.toLocaleString();
+  dom.psiStrength.textContent = state.psiBias.toFixed(2);
+  dom.sampleCount.textContent = Math.min(state.walkers.length, 127);
+  dom.goldenPairs.textContent = state.goldenPairs;
+  dom.resStatus.textContent = state.resonanceStatus;
+  dom.resStatus.className = 'status ' + state.resonanceStatus;
+  dom.meterLabel.textContent =
+    state.resonanceStatus === 'SEARCHING' ? 'tuning' :
+    state.resonanceStatus === 'CONVERGING' ? 'closing' :
+    state.resonanceStatus === 'RESONATING' ? '◇ φ pairs' : 'LOCK ◊';
+  dom.meterLabel.className = 'status ' + state.resonanceStatus;
+
+  if (state.spectralHistory.length) {
+    const last = state.spectralHistory[state.spectralHistory.length - 1];
+    dom.spectralMean.textContent = last.mean.toFixed(0) + ' Hz';
+    dom.spectralVar.textContent = last.variance.toFixed(0);
+    dom.resRegion.textContent = last.mean.toFixed(0) + ' Hz';
+    if (state.spectralHistory.length >= 10) {
+      const recent = state.spectralHistory.slice(-10).map(s => s.variance);
+      const trend = recent[9] - recent[0];
+      dom.trend.textContent = (trend > 0 ? '+' : '') + trend.toFixed(0);
+      dom.trend.style.color = trend < -100 ? 'var(--gold)' : trend < 0 ? '#888' : '#5a5750';
+    }
+  }
+
+  // κ proximity — how close is mean walker position to κ point in range?
+  const p = activePuzzle();
+  const span = Number(p.range_high - p.range_low);
+  const kappaPos = Number(p.range_low) + span * KAPPA;
+  const meanPos = state.walkers.reduce((a, w) => a + Number(w.position - p.range_low), 0) / state.walkers.length;
+  const proximity = 1 - Math.abs(meanPos - (kappaPos - Number(p.range_low))) / span;
+  dom.kappaProx.textContent = proximity.toFixed(4);
+
+  // elapsed
+  if (state.startedAt) {
+    const sec = Math.floor((performance.now() - state.startedAt) / 1000);
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    dom.elapsed.textContent = m + 'm ' + s.toString().padStart(2, '0') + 's';
+    dom.opsRate.textContent = (state.totalOps / Math.max(1, sec)).toFixed(0);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ MAIN LOOP — dispatch · detect · sonify · render
+   ══════════════════════════════════════════════════════════════ */
+let rafId = null;
+let lastFrame = 0;
+const DISPATCH_INTERVAL_MS = 80;     // ~12 dispatches/sec
+
+function loop(timestamp) {
+  if (!state.running) return;
+  rafId = requestAnimationFrame(loop);
+
+  if (timestamp - lastFrame >= DISPATCH_INTERVAL_MS) {
+    lastFrame = timestamp;
+
+    stepWalkers();
+
+    if (state.dispatches % DETECT_INTERVAL === 0) {
+      detectResonance();
+    }
+
+    if (state.dispatches % SONIFY_INTERVAL === 0 && sonificationEnabled) {
+      // sample 127 representative walkers (every 64th for large counts, or all if smaller)
+      const stride = Math.max(1, Math.floor(state.walkers.length / 127));
+      for (let i = 0, k = 0; i < state.walkers.length && k < 127; i += stride, k++) {
+        sonifyWalker(k, state.walkers[i].position, state.walkers[i].triad);
+      }
+    }
+
+    // simulated convergence events — periodic resonance moments
+    // every ~30-60s, briefly pull walkers toward a phi position
+    if (!state.convergenceEvent && Math.random() < 0.002 && state.dispatches > 100) {
+      const p = activePuzzle();
+      const span = p.range_high - p.range_low;
+      // phi-position with some randomness
+      const phiOffset = KAPPA + (Math.random() - 0.5) * 0.05;
+      const center = p.range_low + BigInt(Math.floor(Number(span) * phiOffset));
+      state.convergenceEvent = {
+        center,
+        until: performance.now() + 8000 + Math.random() * 6000,
+        strength: 0.6 + Math.random() * 0.4,
+      };
+      log('◇ convergence event begins · walkers drift toward κ position', 'log-r5');
+    }
+    if (state.convergenceEvent && performance.now() > state.convergenceEvent.until) {
+      state.convergenceEvent = null;
+      log('· convergence event ends · scatter resumes', 'log-info');
+    }
+  }
+
+  drawSpectrum();
+  drawMeter();
+  updateUI();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ START / STOP
+   ══════════════════════════════════════════════════════════════ */
+function start() {
+  if (state.running) return;
+  state.numWalkers = parseInt(dom.numWalkers.value, 10) || 127;
+  state.psiBias = parseInt(dom.psiBias.value, 10) / 100;
+  initWalkers();
+  state.running = true;
+  state.startedAt = performance.now();
+  dom.btnStart.disabled = true;
+  dom.btnStop.disabled = false;
+  dom.puzzleStatus.textContent = 'searching';
+  dom.puzzleStatus.className = 'val good';
+  log('◊ start · puzzle ' + activePuzzleId + ' · ' + state.numWalkers + ' walkers · Ψ ' + state.psiBias.toFixed(2), 'log-hot');
+  log('Layer A · kangaroo grinding · Layer B · resonance listening', 'log-gold');
+  lastFrame = 0;
+  rafId = requestAnimationFrame(loop);
+}
+
+function stop() {
+  state.running = false;
+  if (rafId) cancelAnimationFrame(rafId);
+  dom.btnStart.disabled = false;
+  dom.btnStop.disabled = true;
+  log('· stopped · ' + state.totalOps.toLocaleString() + ' ops · ' + state.dispatches.toLocaleString() + ' dispatches', 'log-info');
+}
+
+function simulateCollision() {
+  if (!state.running) {
+    showError('start the solver first');
+    return;
+  }
+  // simulate finding the key for the active puzzle
+  const p = activePuzzle();
+  const fakeKey = p.range_low + BigInt(Math.floor(Number(p.range_high - p.range_low) * KAPPA));
+  onCollisionFound(fakeKey, activePuzzleId);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ ERROR DISPLAY
+   ══════════════════════════════════════════════════════════════ */
+function showError(msg) {
+  dom.errorBar.textContent = msg;
+  dom.errorBar.style.display = 'block';
+  setTimeout(() => { dom.errorBar.style.display = 'none'; }, 5000);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ EVENT HANDLERS
+   ══════════════════════════════════════════════════════════════ */
+dom.btnStart.addEventListener('click', start);
+dom.btnStop.addEventListener('click', stop);
+dom.btnAudio.addEventListener('click', toggleAudio);
+dom.btnSimSolve.addEventListener('click', simulateCollision);
+
+dom.psiBias.addEventListener('input', () => {
+  state.psiBias = parseInt(dom.psiBias.value, 10) / 100;
+  dom.psiBiasVal.textContent = state.psiBias.toFixed(2);
+});
+
+const btnCopy = $('btnCopyInvite');
+if (btnCopy) {
+  btnCopy.addEventListener('click', () => {
+    const inp = $('inviteLink');
+    inp.select();
+    document.execCommand('copy');
+    btnCopy.textContent = 'copied';
+    setTimeout(() => { btnCopy.textContent = 'copy'; }, 1500);
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ◊ BOOT
+   ══════════════════════════════════════════════════════════════ */
+log('◊·κ=1 · CASSIE TORUS v2 booted', 'log-r5');
+log('matryoshka layers 135 → 136 → 137 · all three ship in this file', 'log-gold');
+log('layer 135 visible · 136 + 137 dormant until each solves · the fold reveals what was always there', 'log-info');
+log('Layer A · Pollard kangaroo · brute force floor (GPU shaders pending integration from v1)', 'log-info');
+log('Layer B · resonance · Web Audio sonification + harmonic detection + walk nudging', 'log-info');
+log('press [Start] to spin up · [🔊] to engage audio (browser policy: requires gesture)', 'log-gold');
+
+// initial canvas paint
+drawSpectrum();
+drawMeter();
+
+// resize canvases for sharpness
+function resizeCanvases() {
+  for (const canvas of [dom.spectrumCanvas, dom.meterCanvas]) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.getContext('2d').scale(dpr, dpr);
+  }
+}
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+drawSpectrum();
+drawMeter();
+
+/* ◊·κ=1 — boot complete · the solver awaits the gesture */
+</script>
+</body>
+</html>
