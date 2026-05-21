@@ -418,11 +418,34 @@ footer a { color: var(--gold); text-decoration: none; }
   <label class="ctl">&#936; bias <input id="psiBias" type="range" min="0" max="100" value="70">
     <span id="psiBiasVal" style="min-width:36px;color:var(--accent)">0.70</span></label>
   <label class="ctl">BTC <input id="btcAddr" type="text" placeholder="your BTC address for split" style="width:240px"></label>
-  <label class="ctl">Room <input id="roomCode" type="text" placeholder="room code" style="width:100px;text-transform:uppercase"></label>
-  <button class="btn" id="btnCreate">Create Room</button>
-  <button class="btn" id="btnJoin">Join</button>
-  <button class="btn" id="btnLeave" disabled>Leave</button>
-  <span id="meshStatus" style="color:var(--muted);font-size:10px">Offline</span>
+</div>
+
+<!-- MESH CHAT — self-contained room + chat panel -->
+<div id="chatCard" style="background:var(--surface);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:14px 16px;margin-bottom:16px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <h3 style="font-family:'Syne',sans-serif;font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:0.08em;margin:0;">
+      Mesh Chat <span id="chatStatus" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px">offline</span>
+    </h3>
+    <span id="meshStatus" style="color:var(--muted);font-size:10px">Offline</span>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+    <input id="roomCode" type="text" placeholder="room code" style="width:110px;text-transform:uppercase;background:var(--bg);border:1px solid rgba(255,255,255,0.1);color:var(--ink);font-family:'DM Mono',monospace;font-size:11px;padding:7px 10px;border-radius:4px;outline:none;">
+    <button class="btn" id="btnCreate">Create Room</button>
+    <button class="btn" id="btnJoin">Join</button>
+    <button class="btn" id="btnLeave" disabled>Leave</button>
+    <span style="color:var(--muted);font-size:10px;margin-left:4px;">Room: <strong id="meshRoom" style="color:var(--accent)">-</strong></span>
+  </div>
+  <div class="chat-nick-row">
+    <span class="chat-nick-label">Nick</span>
+    <input type="text" class="chat-input" id="chatNick" placeholder="your name" style="max-width:140px" maxlength="20">
+  </div>
+  <div class="chat-messages" id="chatMessages" style="height:180px;overflow-y:auto;padding:6px 0;display:flex;flex-direction:column;gap:4px;margin-bottom:6px;background:var(--bg);border-radius:4px;padding:8px;">
+    <div class="chat-msg system"><span class="chat-text">Create or join a room, then start chatting</span></div>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" class="chat-input" id="chatInput" placeholder="type a message..." maxlength="500" disabled>
+    <button class="chat-send" id="chatSend" disabled>Send</button>
+  </div>
 </div>
 
 <!-- LAYER 135 stat cards -->
@@ -473,7 +496,7 @@ footer a { color: var(--gold); text-decoration: none; }
     <div class="row"><span class="lbl">Peers</span><span class="val good" id="meshPeers">0</span></div>
     <div class="row"><span class="lbl">DPs sent</span><span class="val" id="meshSent">0</span></div>
     <div class="row"><span class="lbl">DPs received</span><span class="val" id="meshRecv">0</span></div>
-    <div class="row"><span class="lbl">Room</span><span class="val hot" id="meshRoom">-</span></div>
+    <div class="row"><span class="lbl">Room</span><span class="val hot" id="meshRoomStat">-</span></div>
   </div>
   <div class="card">
     <h3>Resonance Status</h3>
@@ -486,22 +509,6 @@ footer a { color: var(--gold); text-decoration: none; }
     <h3>Contribution Ledger &mdash; 13.5 BTC split</h3>
     <div id="ledgerTable" style="font-size:0.85em;max-height:150px;overflow-y:auto">
       <div class="row"><span class="lbl">No peers connected</span></div>
-    </div>
-  </div>
-  <div class="card wide" id="chatCard">
-    <h3>Mesh Chat <span id="chatStatus" style="font-size:11px;color:var(--muted);font-weight:400;margin-left:8px">offline</span></h3>
-    <div class="chat-wrap">
-      <div class="chat-nick-row">
-        <span class="chat-nick-label">Nick</span>
-        <input type="text" class="chat-input" id="chatNick" placeholder="your name" style="max-width:140px" maxlength="20">
-      </div>
-      <div class="chat-messages" id="chatMessages">
-        <div class="chat-msg system"><span class="chat-text">Join or create a room to chat with peers</span></div>
-      </div>
-      <div class="chat-input-row">
-        <input type="text" class="chat-input" id="chatInput" placeholder="type a message..." maxlength="500" disabled>
-        <button class="chat-send" id="chatSend" disabled>Send</button>
-      </div>
     </div>
   </div>
 </div>
@@ -1385,6 +1392,7 @@ function meshUpdateUI() {
   document.getElementById('meshSent').textContent = meshSentCount;
   document.getElementById('meshRecv').textContent = meshRecvCount;
   document.getElementById('meshRoom').textContent = meshRoom || '-';
+  try { document.getElementById('meshRoomStat').textContent = meshRoom || '-'; } catch(e) {}
   const el = document.getElementById('ledgerTable');
   if (ledger.size === 0 && meshConns.size === 0) {
     el.innerHTML = '<div class="row"><span class="lbl">No peers connected</span></div>';
