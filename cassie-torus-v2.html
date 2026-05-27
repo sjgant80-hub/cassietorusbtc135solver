@@ -65,7 +65,10 @@ header {
   color: var(--gold);
   background: rgba(184,151,74,0.08);
   letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: transform 0.12s, background 0.2s;
 }
+.badge:hover { transform: scale(1.06); }
 .badge.active {
   background: rgba(200,55,26,0.12);
   border-color: var(--accent);
@@ -77,7 +80,10 @@ header {
   color: var(--green);
 }
 .badge.dormant {
-  opacity: 0.35;
+  opacity: 0.55;
+}
+.badge.selected {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 12px rgba(200,55,26,0.4);
 }
 
 .controls {
@@ -394,9 +400,9 @@ footer a { color: var(--gold); text-decoration: none; }
     <div class="subtitle">WebGPU kangaroo + resonance · sovereign · 127 eyes never blink · Puzzle #135</div>
   </div>
   <div class="badges">
-    <div class="badge active" id="badge135">135 · active</div>
-    <div class="badge dormant" id="badge136">136 · dormant</div>
-    <div class="badge dormant" id="badge137">137 · dormant</div>
+    <div class="badge active" id="badge135" data-puzzle="135" title="Puzzle 135 · kangaroo (pubkey known)">135 · κ</div>
+    <div class="badge dormant" id="badge136" data-puzzle="136" title="Puzzle 136 · hash160 brute (pubkey unrevealed)">136 · h160</div>
+    <div class="badge dormant" id="badge137" data-puzzle="137" title="Puzzle 137 · hash160 brute (pubkey unrevealed)">137 · h160</div>
   </div>
 </header>
 
@@ -556,18 +562,36 @@ footer a { color: var(--gold); text-decoration: none; }
   <div class="row" style="margin-top:8px">
     <span class="lbl">Nodes connected</span><span class="val gold" id="nodeCount">0</span>
   </div>
+  <div class="row"><span class="lbl">Auto-join room</span><span class="val" id="autoJoinRoom">cassie-136-open</span></div>
+  <div class="row"><span class="lbl">Hash160 rate</span><span class="val gold" id="h160Rate">— keys/s</span></div>
   <div class="invite-link">
-    <input type="text" id="inviteLink" readonly value="https://cassietorus.io/join?layer=136">
+    <input type="text" id="inviteLink" readonly value="">
     <button class="btn gold" id="btnCopyInvite">copy</button>
   </div>
+  <div class="row"><span class="lbl">Per-peer ledger</span><span class="val" id="meshLedger">—</span></div>
 </div>
 
-<!-- LAYER 137 hidden -->
+<!-- LAYER 137 hidden · FallConsensus + Cassandra -->
 <div class="layer-panel" id="layer137Panel">
   <h2>The commons is sovereign &#9674;</h2>
-  <p>Puzzle 136 cracked. CASSIE COMMONS active. The mesh now governs itself via FallConsensus. Cassandra (&Omega;) orchestrates but doesn't decide &mdash; the mesh decides. Propose a target. Vote. The compute is yours.</p>
+  <p>Puzzle 136 cracked. CASSIE COMMONS active. The mesh governs itself via FallConsensus. Cassandra (&Omega;) reads Oracle's prob-torus + open proposals and recommends — but the mesh decides.</p>
   <div class="row" style="margin-top:8px"><span class="lbl">Proposals open</span><span class="val gold" id="proposalCount">0</span></div>
-  <div class="row"><span class="lbl">Reputation tracked</span><span class="val good">all 135 + 136 contributors</span></div>
+  <div class="row"><span class="lbl">Reputation tracked</span><span class="val good">all 135 + 136 + 137 contributors</span></div>
+  <div class="row"><span class="lbl">Cassandra recommends</span><span class="val gold" id="cassandraRec">awaiting Oracle signal</span></div>
+  <div style="margin-top:10px">
+    <div style="font-size:11px; color:var(--muted); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px">Proposals</div>
+    <div id="proposalList" style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;"></div>
+  </div>
+  <div style="margin-top:10px; display:flex; gap:6px; flex-wrap:wrap">
+    <input type="text" id="propTitle" placeholder="proposal title" style="flex:2; min-width:120px; background:var(--surface); color:var(--ink); border:1px solid rgba(255,255,255,0.1); padding:5px 8px; border-radius:4px; font-size:12px">
+    <select id="propKind" style="background:var(--surface); color:var(--ink); border:1px solid rgba(255,255,255,0.1); padding:5px 8px; border-radius:4px; font-size:12px">
+      <option value="target">Target new addr</option>
+      <option value="zone">Tune zone weights</option>
+      <option value="fund">Fund compute</option>
+      <option value="other">Other</option>
+    </select>
+    <button class="btn gold" id="btnPropose">propose</button>
+  </div>
 </div>
 
 <div class="konomi-key">
@@ -749,6 +773,11 @@ const PUZZLES = {
     status: 'active',
     mesh_mode: 'private',
     target_addr: '16RGFo6hjq9ym6Pj7N5H7L1NR1rVPJyw2v',
+    target_hash160: '3b6f58a75a54bfd85d1bc6c51180fdc732992326',
+    pubkey_known: true,
+    pubkey_hex: '02145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16',
+    pubkey_x: 0x145d2611c823a396ef6712ce0f712f09b9b4f3135e3e0aa3230fb9b6d08d1e16n,
+    kernel_mode: 'kangaroo',           // pubkey is known → use EC kangaroo
     prize_btc: 13.5,
     solved_key: null,
     solved_at: null,
@@ -758,8 +787,13 @@ const PUZZLES = {
     range_high: 2n ** 136n,
     status: 'dormant',
     mesh_mode: 'open',
-    target_addr: null,
-    prize_btc: null,
+    target_addr: '1UDHPdovvR985NrWSkdWQDEQ1xuRiTALq',
+    target_hash160: '05257be4b57ee43fc09762d5d3a9ad4a6e1a0364',
+    pubkey_known: false,               // address never spent from → pubkey unrevealed
+    pubkey_hex: null,
+    pubkey_x: null,
+    kernel_mode: 'hash160',            // fall back to hash160 brute · auto-flips to kangaroo on pubkey reveal
+    prize_btc: 13.6,
     solved_key: null,
     solved_at: null,
   },
@@ -768,14 +802,26 @@ const PUZZLES = {
     range_high: 2n ** 137n,
     status: 'dormant',
     mesh_mode: 'sovereign',
-    target_addr: null,
-    prize_btc: null,
+    target_addr: '15nf31J46iLuK1ZkTnqHo7WgN5cARFK3RA',
+    target_hash160: '3482f8986e13c018692053a784481c63a3554c9c',
+    pubkey_known: false,
+    pubkey_hex: null,
+    pubkey_x: null,
+    kernel_mode: 'hash160',
+    prize_btc: 13.7,
     solved_key: null,
     solved_at: null,
   },
 };
 let activePuzzleId = 135;
 function activePuzzle() { return PUZZLES[activePuzzleId]; }
+function activeKernelMode() { return activePuzzle().kernel_mode; }
+function activeRangeLow()  { return activePuzzle().range_low; }
+function activeRangeHigh() { return activePuzzle().range_high; }
+function activeTargetX()   { return activePuzzle().pubkey_x; }  // null if unrevealed
+function activeTargetH160(){ return activePuzzle().target_hash160; }
+window.PUZZLES = PUZZLES;
+window.activePuzzle = activePuzzle;
 
 // ═══════════════════════════════════════════════════
 // ◊ RESONANCE STATE
@@ -2792,21 +2838,397 @@ function revealLayer(id) {
   }
 }
 
-function activateOpenMesh() {
-  log('LAYER 136 / open mesh active / invite link live / onboarding ready', 'log-gold');
-  let n = 1;
-  const tick = setInterval(() => {
-    n++;
-    document.getElementById('nodeCount').textContent = n;
-    document.getElementById('meshPeers').textContent = Math.min(n - 1, 127);
-    if (n > 8 && activePuzzleId !== 136) clearInterval(tick);
-  }, 1500);
+// ◊·κ OPEN MESH · layer 136 · anyone with the link joins · DPs shared · ledger tracks share
+const MESH_ROOM_136 = 'cassie-136-open';
+const MESH_PEER_LEDGER = { peers: new Map() };  // peerId → { dpCount, ms, joined }
+
+function meshLedgerCredit(peerId, dpDelta) {
+  if (!peerId) return;
+  var e = MESH_PEER_LEDGER.peers.get(peerId);
+  if (!e) { e = { dpCount: 0, ms: 0, joined: Date.now() }; MESH_PEER_LEDGER.peers.set(peerId, e); }
+  e.dpCount += (dpDelta || 0);
+  // KCC R3 emission for shared compute
+  if (window.kcc && window.kcc.emit && dpDelta > 0) {
+    try { window.kcc.emit('mesh:dp:share', 3, dpDelta * 0.01, { peer: peerId.slice(0,8) }); } catch(_){}
+  }
+  renderMeshLedger();
 }
+function renderMeshLedger() {
+  var el = document.getElementById('meshLedger');
+  if (!el) return;
+  var peers = Array.from(MESH_PEER_LEDGER.peers.entries()).sort(function(a,b){ return b[1].dpCount - a[1].dpCount; }).slice(0, 8);
+  if (peers.length === 0) { el.textContent = 'no peer contributions yet'; return; }
+  el.innerHTML = peers.map(function(p){
+    var id = p[0].slice(0,10);
+    var c = p[1].dpCount;
+    return '<span style="display:inline-block;margin-right:8px;font-family:DM Mono,monospace">' + id + '·' + c.toLocaleString() + '</span>';
+  }).join('');
+}
+
+function activateOpenMesh() {
+  log('LAYER 136 / open mesh ACTIVE / room=' + MESH_ROOM_136 + ' / anyone with link joins', 'log-gold');
+  // Real invite link with the room + hash160 brute kernel pre-selected
+  try {
+    var inv = document.getElementById('inviteLink');
+    if (inv) inv.value = location.origin + location.pathname + '?layer=136&room=' + MESH_ROOM_136;
+  } catch(_){}
+  // Auto-join the open room (or create if first)
+  setTimeout(function(){
+    try {
+      // Try join first; if no peer answers we'll auto-create as fallback
+      meshJoinRoom(MESH_ROOM_136);
+      setTimeout(function(){
+        // If still no peers after 3s, create the room
+        var nc = document.getElementById('nodeCount');
+        if (nc && Number(nc.textContent || 0) <= 1) {
+          meshCreateRoom(MESH_ROOM_136);
+        }
+      }, 3000);
+    } catch(e) { log('open mesh join: ' + e.message, 'log-hot'); }
+  }, 500);
+  // Switch active puzzle to 136 + start hash160 brute
+  selectPuzzle(136);
+  if (window.running) startHash160Brute(136);
+}
+
+// ◊·κ FALLCONSENSUS · layer 137 · proposals + voting + Cassandra orchestrator
+const FALL_CONSENSUS = {
+  proposals: [],
+  voteWeights: new Map(),  // peerId → cumulative KCC contribution = vote weight
+  reputationCache: 0
+};
+
+function fcAddProposal(title, kind, payload) {
+  var p = { id: Date.now() + Math.random().toString(36).slice(2,8), title: title, kind: kind, payload: payload || {}, votes: 0, voters: new Set(), ts: Date.now() };
+  FALL_CONSENSUS.proposals.unshift(p);
+  if (FALL_CONSENSUS.proposals.length > 20) FALL_CONSENSUS.proposals.length = 20;
+  fcRender();
+  // Broadcast to mesh + Oracle
+  try { if (window.oracleChannel) window.oracleChannel.postMessage({ type:'cassie_proposal', proposal:p, ts: Date.now() }); } catch(_){}
+  try { if (window.FALL_CHANNELS && window.FALL_CHANNELS.signal) window.FALL_CHANNELS.signal.postMessage({ source:'fallcassie', type:'fc_proposal', payload:p }); } catch(_){}
+  return p;
+}
+function fcVote(propId, voterId) {
+  var p = FALL_CONSENSUS.proposals.find(function(x){ return x.id === propId; });
+  if (!p || p.voters.has(voterId)) return;
+  var w = FALL_CONSENSUS.voteWeights.get(voterId) || 1;
+  p.votes += w;
+  p.voters.add(voterId);
+  fcRender();
+  // Top proposal triggers action
+  fcEvaluate();
+}
+function fcRender() {
+  var pc = document.getElementById('proposalCount');
+  if (pc) pc.textContent = FALL_CONSENSUS.proposals.length;
+  var list = document.getElementById('proposalList');
+  if (!list) return;
+  list.innerHTML = FALL_CONSENSUS.proposals.slice(0, 10).map(function(p){
+    var safeTitle = (p.title || '(untitled)').replace(/[<>&"]/g, '');
+    return '<div style="background:var(--surface); border:1px solid rgba(255,255,255,0.08); padding:6px 8px; border-radius:5px; font-size:11px; display:flex; justify-content:space-between; align-items:center; gap:6px">' +
+      '<div><div style="color:var(--ink)">' + safeTitle + '</div><div style="color:var(--muted); font-size:10px">' + p.kind + ' · ' + p.voters.size + ' voters · ' + p.votes.toFixed(1) + ' weight</div></div>' +
+      '<button class="btn gold fc-vote-btn" data-prop="' + p.id + '" style="font-size:10px; padding:3px 8px">vote</button>' +
+      '</div>';
+  }).join('');
+  // Re-wire vote buttons via delegation (idempotent)
+  if (!list._fcWired) {
+    list._fcWired = true;
+    list.addEventListener('click', function(ev){
+      var b = ev.target.closest('.fc-vote-btn');
+      if (!b) return;
+      var pid = b.getAttribute('data-prop');
+      var voter = (window.NODE && window.NODE.id) || 'local';
+      fcVote(pid, voter);
+    });
+  }
+}
+function fcEvaluate() {
+  // If a proposal has > 5 votes and is a target/zone kind, Cassandra recommends acting
+  var top = FALL_CONSENSUS.proposals.slice().sort(function(a,b){ return b.votes - a.votes; })[0];
+  if (!top || top.votes < 5) return;
+  var rec = document.getElementById('cassandraRec');
+  if (rec) rec.textContent = 'enact: ' + top.title + ' (' + top.votes.toFixed(0) + ' votes)';
+  log('◊ Cassandra · proposal enacted · ' + top.title + ' (' + top.kind + ')', 'log-hot');
+}
+window.fcVote = fcVote;
 
 function activateSovereignMesh() {
   log('CASSIE COMMONS / FallConsensus engaged / the mesh governs / proposals open', 'log-hot');
-  document.getElementById('proposalCount').textContent = '3';
+  // Seed 3 example proposals so the surface is alive
+  if (FALL_CONSENSUS.proposals.length === 0) {
+    fcAddProposal('Target puzzle 140 next', 'target', { puzzle: 140 });
+    fcAddProposal('Boost zone B to 70%', 'zone', { zones: [0.20, 0.70, 0.10] });
+    fcAddProposal('Open mesh to 256 nodes', 'fund', { nodeCap: 256 });
+  }
+  fcRender();
+  // Switch UI title
+  var title = document.title;
+  if (!title.includes('COMMONS')) document.title = 'CASSIE COMMONS · ◊';
+  // Cassandra orchestrator: read Oracle's prob-torus + open proposals, recommend
+  window._cassandraTick = setInterval(function(){
+    var rec = document.getElementById('cassandraRec');
+    if (!rec) return;
+    var line = '';
+    if (window._oraclePrediction && window._oraclePrediction.confidence > 0.4) {
+      line = 'Oracle ' + window._oraclePrediction.state + ' @ pos ' + window._oraclePrediction.position + ' · conf ' + (window._oraclePrediction.confidence*100).toFixed(0) + '% · suggest: ' + window._oraclePrediction.level;
+    } else if (FALL_CONSENSUS.proposals.length > 0) {
+      var top = FALL_CONSENSUS.proposals.slice().sort(function(a,b){ return b.votes - a.votes; })[0];
+      line = 'no Oracle lock · top proposal: ' + (top.title || '(none)') + ' · ' + top.votes.toFixed(1) + ' votes';
+    } else {
+      line = 'awaiting Oracle signal';
+    }
+    rec.textContent = line;
+  }, 2000);
+  // Wire propose button
+  setTimeout(function(){
+    var btn = document.getElementById('btnPropose');
+    if (btn && !btn._wired) {
+      btn._wired = true;
+      btn.addEventListener('click', function(){
+        var t = document.getElementById('propTitle').value.trim();
+        var k = document.getElementById('propKind').value;
+        if (!t) return;
+        fcAddProposal(t, k);
+        document.getElementById('propTitle').value = '';
+      });
+    }
+  }, 100);
 }
+window.fallConsensus = { activate: activateSovereignMesh, propose: fcAddProposal, vote: fcVote };
+
+// ═══════════════════════════════════════════════════
+// ◊·κ MATRYOSHKA SWITCHER — click 135/136/137 to change active puzzle
+// ═══════════════════════════════════════════════════
+function selectPuzzle(id) {
+  id = Number(id);
+  if (!PUZZLES[id]) return;
+  if (id === activePuzzleId) return;
+  // Stop hash160 worker if running
+  if (window._hashBrute && window._hashBrute.stop) window._hashBrute.stop();
+  activePuzzleId = id;
+  // Visual selection
+  document.querySelectorAll('.badge[data-puzzle]').forEach(function(el){
+    el.classList.toggle('selected', Number(el.dataset.puzzle) === id);
+  });
+  var p = PUZZLES[id];
+  log('◊ puzzle switched · #' + id + ' · kernel=' + p.kernel_mode + ' · target=' + p.target_addr + ' · prize=' + p.prize_btc + ' BTC', 'log-r5');
+  // Update subtitle
+  var sub = document.querySelector('.subtitle');
+  if (sub) sub.textContent = 'WebGPU kangaroo + resonance · sovereign · 127 eyes never blink · Puzzle #' + id + ' · ' + p.kernel_mode;
+  // If running, hot-swap the kernel
+  if (window.running) {
+    if (p.kernel_mode === 'hash160' && !p.pubkey_known) startHash160Brute(id);
+  }
+}
+// Attach badge click handlers + initial selected state once DOM is up
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.badge[data-puzzle]').forEach(function(el){
+    el.addEventListener('click', function(){ selectPuzzle(el.dataset.puzzle); });
+  });
+  var b135 = document.getElementById('badge135');
+  if (b135) b135.classList.add('selected');
+});
+
+// ═══════════════════════════════════════════════════
+// ◊·κ HASH160 BRUTE KERNEL — for puzzles whose pubkey isn't revealed yet
+// CPU JS via @noble/curves · zone-biased key picker · throttled · runs as
+// Web Worker so it doesn't block the UI. When kernel detects a hash160 hit,
+// the key is verified and we fire onCollisionFound() exactly as kangaroo does.
+// ═══════════════════════════════════════════════════
+window._hashBrute = { running: false, worker: null, attempts: 0, rate: 0, lastRateT: 0, stop: function(){} };
+function startHash160Brute(puzzleId) {
+  var p = PUZZLES[puzzleId];
+  if (!p || p.kernel_mode !== 'hash160') return;
+  if (window._hashBrute.running) return;
+
+  // Build worker code as a Blob string
+  var workerCode = `
+    self.onmessage = async function(e) {
+      const m = e.data;
+      if (m.cmd === 'stop') { self.close(); return; }
+      if (m.cmd !== 'start') return;
+      const { target_hash160, range_low, range_high, zones } = m;
+      let secp, sha, rip;
+      try {
+        secp = (await import('https://esm.sh/@noble/curves@1.7.0/secp256k1')).secp256k1;
+        sha  = (await import('https://esm.sh/@noble/hashes@1.5.0/sha256')).sha256;
+        rip  = (await import('https://esm.sh/@noble/hashes@1.5.0/ripemd160')).ripemd160;
+      } catch(err) {
+        self.postMessage({ type:'err', msg: 'hash160 worker import: ' + err.message });
+        return;
+      }
+      const rLow  = BigInt(range_low);
+      const rHigh = BigInt(range_high);
+      const rSize = rHigh - rLow;
+      function hex2b(h){ const a = new Uint8Array(h.length/2); for (let i=0;i<a.length;i++) a[i]=parseInt(h.substr(i*2,2),16); return a; }
+      const targetBytes = hex2b(target_hash160);
+      function eq(a,b){ if (a.length!==b.length) return false; for (let i=0;i<a.length;i++) if (a[i]!==b[i]) return false; return true; }
+      function b2h(b){ let s=''; for (let i=0;i<b.length;i++) s += b[i].toString(16).padStart(2,'0'); return s; }
+      let n = 0, t0 = performance.now();
+      // Zone-biased sampler: pick u in [0,1) using same 3-zone weighting as Layer B
+      const ZW = zones || [{c:0.28,s:0.08,w:0.25},{c:0.67,s:0.075,w:0.60},{c:0.5,s:0.5,w:0.15}];
+      function gauss(mu, sigma){
+        let u=Math.random(), v=Math.random();
+        let z=Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+        return mu + sigma*z;
+      }
+      function pickU(){
+        const r = Math.random(); let acc = 0;
+        for (const z of ZW){ acc += z.w; if (r<acc){ let v=gauss(z.c, z.s); if (v<0) v=0; if (v>=1) v=1-1e-12; return v; } }
+        return Math.random();
+      }
+      // Random BigInt in range from u
+      function pickKey(){
+        const u = pickU();
+        // Scale u (53-bit float) up to rSize using 256-bit fraction
+        // Simpler approach: u * 2^53, multiply rSize → rough; for cryptographic spread
+        // we re-randomise low bits.
+        const hi = BigInt(Math.floor(u * Number(1n << 53n)));
+        const scaled = (hi * rSize) >> 53n;
+        // Low-bit jitter
+        const jit = BigInt(Math.floor(Math.random() * 1e15));
+        return rLow + ((scaled + jit) % rSize);
+      }
+      function privTo32(k){
+        let h = k.toString(16);
+        if (h.length % 2) h = '0' + h;
+        h = h.padStart(64, '0');
+        return hex2b(h);
+      }
+      while (true) {
+        // Burst of 200 attempts between yields
+        for (let i = 0; i < 200; i++) {
+          const k = pickKey();
+          const privBytes = privTo32(k);
+          let pubC, pubU, h160c, h160u;
+          try {
+            pubC = secp.getPublicKey(privBytes, true);   // compressed
+            h160c = rip(sha(pubC));
+            if (eq(h160c, targetBytes)) {
+              self.postMessage({ type:'hit', form:'compressed', key:k.toString(16), pub:b2h(pubC) });
+              return;
+            }
+            pubU = secp.getPublicKey(privBytes, false);  // uncompressed
+            h160u = rip(sha(pubU));
+            if (eq(h160u, targetBytes)) {
+              self.postMessage({ type:'hit', form:'uncompressed', key:k.toString(16), pub:b2h(pubU) });
+              return;
+            }
+          } catch(err){ /* skip degenerate key */ }
+          n++;
+        }
+        // Progress report every burst
+        const now = performance.now();
+        const elapsed = (now - t0) / 1000;
+        self.postMessage({ type:'progress', attempts: n, rate: elapsed > 0 ? n/elapsed : 0 });
+        await new Promise(r => setTimeout(r, 0));
+      }
+    };
+  `;
+  var blob = new Blob([workerCode], { type:'application/javascript' });
+  var workerUrl = URL.createObjectURL(blob);
+  var w;
+  try {
+    w = new Worker(workerUrl, { type:'module' });
+  } catch(err) {
+    log('hash160 brute · worker failed: ' + err.message, 'log-warn');
+    return;
+  }
+  window._hashBrute.running = true;
+  window._hashBrute.worker = w;
+  window._hashBrute.attempts = 0;
+  window._hashBrute.rate = 0;
+  window._hashBrute.stop = function(){ try { w.postMessage({cmd:'stop'}); w.terminate(); } catch(_){} URL.revokeObjectURL(workerUrl); window._hashBrute.running = false; window._hashBrute.worker = null; };
+  w.onmessage = function(ev) {
+    var m = ev.data;
+    if (m.type === 'progress') {
+      window._hashBrute.attempts = m.attempts;
+      window._hashBrute.rate = m.rate;
+      var rateEl = document.getElementById('h160Rate');
+      if (rateEl) rateEl.textContent = Math.round(m.rate).toLocaleString() + ' keys/s · ' + m.attempts.toLocaleString() + ' tried';
+    } else if (m.type === 'hit') {
+      log('◊◊◊ HASH160 HIT · puzzle ' + puzzleId + ' · form=' + m.form + ' · key=' + m.key.slice(0,16) + '...', 'log-hot');
+      try {
+        // Promote pubkey · then dispatch through the normal collision pipe
+        PUZZLES[puzzleId].pubkey_hex = m.pub;
+        PUZZLES[puzzleId].pubkey_known = true;
+        PUZZLES[puzzleId].kernel_mode = 'kangaroo';
+        onCollisionFound(BigInt('0x' + m.key), puzzleId);
+      } catch(err) { console.error(err); }
+      window._hashBrute.stop();
+    } else if (m.type === 'err') {
+      log('hash160 worker: ' + m.msg, 'log-hot');
+    }
+  };
+  w.postMessage({
+    cmd: 'start',
+    target_hash160: p.target_hash160,
+    range_low:  '0x' + p.range_low.toString(16),
+    range_high: '0x' + p.range_high.toString(16),
+    zones: ZONES.map(function(z){ return { c:z.centre, s:z.spread, w:z.weight }; })
+  });
+  log('◊ hash160 brute · puzzle ' + puzzleId + ' · target=' + p.target_hash160 + ' · zone-biased · CPU worker live', 'log-gold');
+}
+
+// ═══════════════════════════════════════════════════
+// ◊·κ PUBKEY WATCHER — poll mempool.space for spends from 136/137 addresses.
+// When the address is spent from, the input script reveals the pubkey, which
+// flips the puzzle from hash160 brute to fast EC kangaroo.
+// ═══════════════════════════════════════════════════
+window._pubkeyWatcher = { lastPoll: 0, running: false };
+async function pubkeyWatcherTick() {
+  if (window._pubkeyWatcher.running) return;
+  window._pubkeyWatcher.running = true;
+  try {
+    for (var id of [136, 137]) {
+      var p = PUZZLES[id];
+      if (!p || p.pubkey_known) continue;
+      var url = 'https://mempool.space/api/address/' + p.target_addr + '/txs';
+      try {
+        var resp = await fetch(url, { cache:'no-store' });
+        if (!resp.ok) continue;
+        var txs = await resp.json();
+        if (!Array.isArray(txs) || txs.length === 0) continue;
+        // Look for a tx where this address appears as a SPENDER (input scriptsig has pubkey)
+        for (var tx of txs) {
+          if (!tx.vin) continue;
+          for (var vin of tx.vin) {
+            if (vin.prevout && vin.prevout.scriptpubkey_address === p.target_addr) {
+              // Extract pubkey from scriptsig_asm or witness
+              var pubkey = null;
+              if (vin.witness && vin.witness.length >= 2) pubkey = vin.witness[1];        // P2WPKH
+              else if (vin.scriptsig_asm) {
+                // legacy P2PKH: "<sig> <pubkey>"
+                var parts = vin.scriptsig_asm.split(/\s+/);
+                pubkey = parts[parts.length - 1];
+              }
+              if (pubkey && /^[0-9a-fA-F]+$/.test(pubkey) && (pubkey.length === 66 || pubkey.length === 130)) {
+                p.pubkey_hex = pubkey;
+                p.pubkey_known = true;
+                // Extract X coord (skip 02/03/04 prefix byte = 2 hex chars)
+                p.pubkey_x = BigInt('0x' + pubkey.slice(2, 66));
+                p.kernel_mode = 'kangaroo';
+                log('◊◊◊ PUBKEY EXPOSED · puzzle ' + id + ' · ' + pubkey.slice(0, 20) + '... · kernel flips to kangaroo', 'log-hot');
+                // Notify Oracle + mesh
+                try { if (window.oracleChannel) window.oracleChannel.postMessage({ type:'pubkey_exposed', puzzle:id, pubkey_hex:pubkey, ts:Date.now() }); } catch(_){}
+                break;
+              }
+            }
+          }
+          if (p.pubkey_known) break;
+        }
+      } catch(e) {
+        // Silent — watcher tries again next tick
+      }
+    }
+  } finally {
+    window._pubkeyWatcher.running = false;
+    window._pubkeyWatcher.lastPoll = Date.now();
+  }
+}
+// Tick every 60s · also runs once on startup
+setTimeout(pubkeyWatcherTick, 4000);
+setInterval(pubkeyWatcherTick, 60000);
 
 // ═══════════════════════════════════════════════════
 // v1 MAIN LOOP — GPU dispatch + resonance hooks
@@ -3147,8 +3569,24 @@ window.addEventListener('resize', resizeCanvases);
       setTimeout(function(){
         if (window.oracleChannel) try { window.oracleChannel.postMessage({ type:'cassie_hello', tab: TAB_ID, zones: ZONES, hemisphere: TARGET_HEMISPHERE, ts: Date.now() }); } catch(_){}
       }, 800);
-      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + 3-zone Ψ (wave/fold/none) + consonance + Oracle Torus Meta-Walk coupling (key-torus ↔ prob-torus, dps_sample shipping) / seed v18');
+      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + hash160 brute (136/137) + Oracle Torus Meta-Walk + open mesh + FallConsensus / seed v18');
       if (location.search.includes('autostart')) { log('Auto-starting...', 'log-info'); btnStart.click(); }
+
+      // ◊·κ Honour invite-link · ?layer=136&room=cassie-136-open  or  ?layer=137
+      try {
+        var qs = new URLSearchParams(location.search);
+        var qLayer = qs.get('layer');
+        var qRoom  = qs.get('room');
+        if (qLayer === '136') {
+          PUZZLES[136].status = 'active';
+          revealLayer(136);
+          setTimeout(function(){ selectPuzzle(136); activateOpenMesh(); if (qRoom) setTimeout(function(){ meshJoinRoom(qRoom); }, 1200); }, 200);
+        } else if (qLayer === '137') {
+          PUZZLES[136].status = 'active'; PUZZLES[137].status = 'active';
+          revealLayer(136); revealLayer(137);
+          setTimeout(function(){ selectPuzzle(137); activateSovereignMesh(); }, 200);
+        }
+      } catch(e){ log('layer param parse: ' + e.message, 'log-warn'); }
     }
 
     // Restore chat nick
