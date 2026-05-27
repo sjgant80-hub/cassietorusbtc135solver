@@ -625,17 +625,16 @@ const KAPPA_WEIGHT = 0.7;
 const WITNESS_WEIGHT = 0.3;
 
 // ════════════════════════════════════════════════════════════════
-// ◊·κ UNIFIED RESONANCE · 4-zone spawn distribution (κ·◦ spec)
-// Zone A · wave    · 0.28   ± 0.08   · 25% · sine resonance peak
-// Zone B · fold    · 0.618  ± 0.02   · 40% · κ exact · highest conf
-// Zone C · tritone · 0.7071 ± 0.015  · 20% · 1/√2 · 135=Eb interval
-// Zone U · none    · 0.5    ± 0.5    · 15% · safety net (no bias)
+// ◊·κ FINAL CONSOLIDATED · 3-zone spawn distribution (CASSIE_FINAL_UPDATE_CC)
+// Zone A · wave · 0.28  ± 0.08  · 25% · sine resonance + witness + P65
+// Zone B · fold · 0.67  ± 0.075 · 60% · MERGED κ+tritone+gate+CRT (0.60-0.75 band)
+// Zone U · none · 0.50  ± 0.50  · 15% · full-range safety net
+// (Oracle Engine can adjust these weights at runtime via fall-signal)
 // ════════════════════════════════════════════════════════════════
 const ZONES = [
-  { id: 'A', name: 'wave',    centre: 0.28,   spread: 0.08,  weight: 0.25, glyph: '[0][1][0][1][0][0]' },
-  { id: 'B', name: 'fold',    centre: KAPPA,  spread: 0.02,  weight: 0.40, glyph: '[1][0][0][1][0][0]' },
-  { id: 'C', name: 'tritone', centre: 0.7071, spread: 0.015, weight: 0.20, glyph: '[1][1][0][0][1][1]' },
-  { id: 'U', name: 'none',    centre: 0.5,    spread: 0.5,   weight: 0.15, glyph: '[0][0][0][0][0][0]' }
+  { id: 'A', name: 'wave', centre: 0.28, spread: 0.08,  weight: 0.25, why: 'sine period 7+π · witness 0.317 · P65 intervals' },
+  { id: 'B', name: 'fold', centre: 0.67, spread: 0.075, weight: 0.60, why: 'κ 0.618 + tritone 0.707 + gate 0.747 + CRT · primary band' },
+  { id: 'U', name: 'none', centre: 0.5,  spread: 0.5,   weight: 0.15, why: 'safety net · full range' }
 ];
 
 // Pick a zone by weight, then sample gaussian within it
@@ -1282,7 +1281,7 @@ async function initWalks(count) {
   // ◊·κ UNIFIED RESONANCE · 4-zone spec replaces dual-peak when feature flag on
   const useZones = !document.getElementById('classicBiasToggle') || !document.getElementById('classicBiasToggle').checked;
   if (useZones) {
-    log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', 4-zone spec: A wave 0.28·25% / B fold κ·40% / C tritone 0.7071·20% / U none·15%)...', 'log-info');
+    log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', 3-zone final: A wave 0.28·25% / B fold 0.67·60% (κ+tritone+gate+CRT) / U none·15%)...', 'log-info');
   } else {
     log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', classic dual-peak κ=' + KAPPA.toFixed(3) + '/w=' + WITNESS.toFixed(3) + ')...', 'log-info');
   }
@@ -1292,7 +1291,7 @@ async function initWalks(count) {
   const wildCount = count - tameCount;
   const walks = [];
   let bayesN = 0, kappaHits = 0, witnessHits = 0;
-  const zoneHits = { A: 0, B: 0, C: 0, U: 0 };
+  const zoneHits = { A: 0, B: 0, U: 0 };
   const t0 = performance.now();
 
   for (let i = 0; i < tameCount; i++) {
@@ -1320,7 +1319,7 @@ async function initWalks(count) {
     if ((i+1) % 200 === 0) { log('  tame: ' + (i+1) + '/' + tameCount, 'log-info'); await new Promise(r => setTimeout(r, 0)); }
   }
   if (useZones) {
-    log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased · zone: A ' + zoneHits.A + ' · B ' + zoneHits.B + ' · C ' + zoneHits.C + ' · U ' + zoneHits.U + ', ' + (tameCount-bayesN) + ' θ-spread)', 'log-gold');
+    log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased · zone: A ' + zoneHits.A + ' · B ' + zoneHits.B + ' · U ' + zoneHits.U + ', ' + (tameCount-bayesN) + ' θ-spread)', 'log-gold');
   } else {
     log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased: ' + kappaHits + ' κ-peak + ' + witnessHits + ' witness-peak, ' + (tameCount-bayesN) + ' θ-spread)', 'log-info');
   }
@@ -2443,6 +2442,25 @@ function detectResonance() {
     if (status === 'SEARCHING' && window._lastResStatus !== 'SEARCHING') log('resonance scattered / returning to search', 'log-info');
   }
 
+  // ◊·κ B5 — Oracle Engine ripple · throttle 1/s
+  if (window.oracleChannel) {
+    var now = Date.now();
+    if (!window._lastOracleSend || (now - window._lastOracleSend) > 1000) {
+      window._lastOracleSend = now;
+      try {
+        window.oracleChannel.postMessage({
+          type: 'cassie_update',
+          tab: TAB_ID,
+          ts: now,
+          resonance: { status: status, strength: strength, schumann: schumannStrength, r6Hz: r6Mean, phiPairs: phiPairs, consonance: consonance, mean: mean, variance: variance, intervals: intervalCounts },
+          zones: { A: ZONES[0].weight, B: ZONES[1].weight, U: ZONES[2].weight },
+          freqs_sample: heartFreqs.slice(0, 32),
+          dps_total: window.dpStore ? window.dpStore.size : 0
+        });
+      } catch(_){}
+    }
+  }
+
   return { status, strength, region: mean, variance, mean, schumann: schumannStrength, r6Hz: r6Mean };
 }
 
@@ -2625,6 +2643,28 @@ function onCollisionFound(privateKey, puzzleId) {
 
   log('COLLISION / puzzle ' + puzzleId + ' SOLVED / key ' + privateKey.toString(16).slice(0, 20) + '...', 'log-hot');
   celebrateSolve(puzzleId);
+
+  // ◊·κ B6 — Matryoshka chain: ripple to Oracle, KCC, FallSignal
+  try {
+    if (window.oracleChannel) {
+      window.oracleChannel.postMessage({
+        type: 'cassie_solve',
+        puzzle: puzzleId,
+        key_hex_head: privateKey.toString(16).slice(0, 16),
+        next_layer: puzzleId + 1,
+        ts: Date.now(),
+        action_required: puzzleId === 135 ? 'SWEEP_BTC_IMMEDIATELY · activate 136 search · fund KCC listing · open public mesh' : null
+      });
+    }
+    if (window.kcc && window.kcc.emit) {
+      window.kcc.emit('cassie:solve:' + puzzleId, 6, 10, { key_head: privateKey.toString(16).slice(0, 12) });
+    }
+    // Cross-mesh fall-kcc + fall-signal alerts
+    try { new BroadcastChannel('fall-signal').postMessage({ type:'cassie_solve_alert', puzzle: puzzleId, ts: Date.now(), severity: 'critical' }); } catch(_){}
+    if (puzzleId === 135) {
+      log('◊ 135 SOLVED · SWEEP BTC NOW · 136 activates in 3s · KCC listing funded · public mesh opening', 'log-hot');
+    }
+  } catch(e) { console.warn('matryoshka ripple:', e); }
 
   const badge = document.getElementById('badge' + puzzleId);
   if (badge) {
@@ -2998,10 +3038,37 @@ window.addEventListener('resize', resizeCanvases);
       document.getElementById('btnImport').disabled = false;
       document.getElementById('btnMerge').disabled = false;
       log('Tab: ' + TAB_ID + ' | BroadcastChannel: active | IndexedDB: ' + (dpDB?'ready':'off'), 'log-info');
-      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° | ◊·κ unified resonance: 4 zones (A wave 0.28·25% / B fold κ·40% / C tritone 0.7071·20% / U none·15%)', 'log-info');
+      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° | ◊·κ FINAL: 3 zones (A wave 0.28·25% / B fold 0.67·60% merged κ+tritone+gate+CRT / U none·15%)', 'log-info');
       log('WebRTC Mesh: Create or Join a room to share DPs peer-to-peer', 'log-info');
       log('Layer B: resonance detection + audio sonification ready', 'log-r5');
-      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + unified resonance / 4-zone Ψ (wave/fold/tritone/none) + consonance / seed v18');
+      // ◊·κ B5 — Oracle Engine bridge · fall-signal channel
+      try {
+        window.oracleChannel = new BroadcastChannel('fall-signal');
+        window.oracleChannel.onmessage = function(e){
+          var m = e.data || {};
+          if (m.type === 'zone_update' && Array.isArray(m.weights)) {
+            // Oracle sends [A weight, B weight, U weight]
+            if (m.weights.length === 3) {
+              ZONES[0].weight = m.weights[0];
+              ZONES[1].weight = m.weights[1];
+              ZONES[2].weight = m.weights[2];
+              log('◊ Oracle zone update · A=' + (ZONES[0].weight*100).toFixed(0) + '% · B=' + (ZONES[1].weight*100).toFixed(0) + '% · U=' + (ZONES[2].weight*100).toFixed(0) + '%', 'log-gold');
+            }
+          }
+          if (m.type === 'filter_update' && m.rates) {
+            if (typeof m.rates.mod31 === 'number') window.MOD31_BIAS_RATE = m.rates.mod31;
+            if (typeof m.rates.mod19 === 'number') window.MOD19_BIAS_RATE = m.rates.mod19;
+            if (typeof m.rates.crt589 === 'number') window.CRT_BIAS_RATE = m.rates.crt589;
+            log('◊ Oracle filter update · mod31@' + ((window.MOD31_BIAS_RATE||0)*100).toFixed(0) + '% · mod19@' + ((window.MOD19_BIAS_RATE||0)*100).toFixed(0) + '% · CRT@' + ((window.CRT_BIAS_RATE||0)*100).toFixed(0) + '%', 'log-gold');
+          }
+        };
+        log('◊·κ Oracle bridge: fall-signal channel open · Oracle Engine v2 may listen', 'log-r5');
+      } catch(_){}
+      // Send initial state snapshot to Oracle (lets it discover us)
+      setTimeout(function(){
+        if (window.oracleChannel) try { window.oracleChannel.postMessage({ type:'cassie_hello', tab: TAB_ID, zones: ZONES, hemisphere: TARGET_HEMISPHERE, ts: Date.now() }); } catch(_){}
+      }, 800);
+      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + 3-zone Ψ (wave/fold/none) + consonance + Oracle bridge / seed v18');
       if (location.search.includes('autostart')) { log('Auto-starting...', 'log-info'); btnStart.click(); }
     }
 
