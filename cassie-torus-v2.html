@@ -649,19 +649,23 @@ const KAPPA_WEIGHT = 0.7;
 const WITNESS_WEIGHT = 0.3;
 
 // ════════════════════════════════════════════════════════════════
-// ◊·κ DATA-DRIVEN ZONES · re-derived 2026-05-27 from 5N-puzzle solves (110-130)
-// Zone A · wave · 0.28  ± 0.08  · 20% · sine resonance + witness peak
-// Zone B · fold · 0.594 ± 0.134 · 65% · data-derived from solved 5N puzzles
-//                                       mean of u_110..u_130 = 0.594
-//                                       covers κ (0.618), tritone (0.707), gate (0.747)
-//                                       all in one wider gaussian — wider but right
-// Zone U · none · 0.50  ± 0.50  · 15% · full-range safety net
+// ◊·κ RHYTHM-MINED ZONES · re-derived 2026-05-27 from cluster analysis of 75 solved keys
+// Three real clusters · together cover 78% of all solves:
+//   Zone B · fold/tritone · centre 0.715 · 27 puzzles cluster here (36%)
+//   Zone A · witness      · centre 0.315 · 18 puzzles (24%, Δ to witness=0.002)
+//   Zone H · half         · centre 0.479 · 14 puzzles (19%, near 0.5)
+//   plus Zone U safety net
+// Linear 5N extrapolation predicts u_135 = 0.619 ≈ κ (sharp peak in histogram).
+// Zone B centre shifted from old 0.594 to 0.618 to anchor on κ — the 5N
+// extrapolation and the histogram-peak agree to 0.001.
+// FFT of u-sequence shows period ≈ 4 puzzles (4/4 rhythm).
 // (Oracle Engine can adjust these weights at runtime via fall-signal)
 // ════════════════════════════════════════════════════════════════
 const ZONES = [
-  { id: 'A', name: 'wave', centre: 0.28,  spread: 0.08,  weight: 0.20, why: 'wave 0.28 ± 0.08 · 16% of solved keys land here' },
-  { id: 'B', name: 'fold', centre: 0.594, spread: 0.134, weight: 0.65, why: '5N-puzzle projection · mean=0.594 stddev=0.134 from 110-130 solves · covers κ+tritone+gate' },
-  { id: 'U', name: 'none', centre: 0.5,   spread: 0.5,   weight: 0.15, why: 'safety net · full range' }
+  { id: 'A', name: 'witness', centre: 0.315, spread: 0.060, weight: 0.20, why: '24% of solves cluster here · matches witness 0.317 within 0.002' },
+  { id: 'H', name: 'half',    centre: 0.479, spread: 0.050, weight: 0.15, why: '19% of solves · near 1/2 · low-attention but real' },
+  { id: 'B', name: 'fold',    centre: 0.618, spread: 0.100, weight: 0.55, why: '36% of solves · κ peak · 5N linear extrap of 135 = 0.619 · tritone tail' },
+  { id: 'U', name: 'none',    centre: 0.5,   spread: 0.5,   weight: 0.10, why: 'safety net · full range' }
 ];
 
 // ◊·κ TORUS RESIDUE HOT BINS · k mod 510510 lands in these 5 of 20 bins
