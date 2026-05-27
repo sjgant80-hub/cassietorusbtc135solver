@@ -426,6 +426,21 @@ footer a { color: var(--gold); text-decoration: none; }
   <label class="ctl">BTC <input id="btcAddr" type="text" placeholder="your BTC address for split" style="width:240px"></label>
 </div>
 
+<!-- ◊·κ PRIORITY SWEEP · destination wallet primed BEFORE key drops -->
+<div class="controls" style="padding:10px 12px;background:var(--surface-2);border:1px solid var(--green);border-radius:7px;margin-bottom:10px">
+  <span style="color:var(--green);font-weight:bold">◊ PRIME WALLET</span>
+  <label class="ctl" style="flex:1">
+    <input id="sweepDest" type="text" placeholder="Destination BTC address (P2PKH 1.../bc1q.../3...) — your COLD wallet, where 13.5 BTC will go on key find" style="min-width:380px;width:100%;background:var(--surface);color:var(--ink);border:1px solid rgba(255,255,255,0.1);padding:7px 10px;border-radius:4px;font-family:DM Mono,monospace">
+  </label>
+  <button class="btn gold" id="btnPrimeSweep" style="min-width:120px">Prime</button>
+  <label class="ctl" style="margin-left:10px">
+    <input id="sweepAuto" type="checkbox" style="margin-right:6px">
+    <span style="color:var(--accent);font-weight:bold">AUTO-BROADCAST</span>
+    <span style="color:var(--muted);font-size:10px;margin-left:4px">(zero-click on key find)</span>
+  </label>
+  <span id="sweepStatus" style="margin-left:10px;color:var(--muted);font-family:DM Mono,monospace;font-size:11px">not primed</span>
+</div>
+
 <!-- MESH CHAT — self-contained room + chat panel -->
 <div id="chatCard" style="background:var(--surface);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:14px 16px;margin-bottom:16px;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
@@ -3027,6 +3042,280 @@ function drawMeter() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════
+// ◊·κ PRIORITY SWEEP · primed-wallet · sub-60-second key→funds
+// Pre-loads @noble libs · pre-fetches UTXOs · validates destination ·
+// optional AUTO-BROADCAST for zero-click. Defends against mempool bots
+// that watch puzzle addresses by signing with max fee from the start.
+// ════════════════════════════════════════════════════════════════
+window.SWEEP = {
+  destination: null,        // primed BTC address (P2PKH/P2WPKH/P2SH)
+  auto: false,              // auto-broadcast on key find
+  crypto: null,             // pre-loaded @noble handles {sha, rip, secp}
+  utxos: null,              // pre-fetched UTXOs at active puzzle address
+  utxosTs: 0,
+  utxosFundedAddr: null,
+  utxosFundedType: null,
+  utxosPubKey: null,
+  feeRate: 50,              // fastest fee rate (sat/vB) · refreshed every 60s
+  feeTs: 0,
+  swept: false              // idempotency flag
+};
+
+// Validate destination address (basic — supports P2PKH 1.../bc1q/3...)
+function sweepValidateAddr(addr) {
+  if (!addr || typeof addr !== 'string') return false;
+  addr = addr.trim();
+  if (addr.length < 26 || addr.length > 90) return false;
+  if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(addr)) return true;
+  if (/^bc1[a-z0-9]{6,87}$/i.test(addr)) return true;
+  return false;
+}
+
+// Persist + load destination from localStorage
+function sweepLoadDest() {
+  try {
+    const d = localStorage.getItem('cassie_sweep_dest');
+    const a = localStorage.getItem('cassie_sweep_auto');
+    if (d && sweepValidateAddr(d)) {
+      window.SWEEP.destination = d;
+      const input = document.getElementById('sweepDest');
+      if (input) input.value = d;
+    }
+    if (a === '1') {
+      window.SWEEP.auto = true;
+      const chk = document.getElementById('sweepAuto');
+      if (chk) chk.checked = true;
+    }
+    sweepRenderStatus();
+  } catch(_){}
+}
+
+function sweepRenderStatus() {
+  const el = document.getElementById('sweepStatus');
+  if (!el) return;
+  const s = window.SWEEP;
+  if (!s.destination) { el.textContent = 'not primed'; el.style.color = 'var(--muted)'; return; }
+  let txt = '✓ primed → ' + s.destination.slice(0, 8) + '…' + s.destination.slice(-6);
+  if (s.crypto) txt += ' · libs ready';
+  if (s.utxos) txt += ' · ' + s.utxos.length + ' UTXOs cached';
+  if (s.auto) txt += ' · AUTO';
+  if (s.swept) txt += ' · SWEPT';
+  el.textContent = txt;
+  el.style.color = s.swept ? 'var(--accent)' : 'var(--green)';
+}
+
+// Pre-load @noble libs (call once on Start)
+async function sweepWarmCrypto() {
+  if (window.SWEEP.crypto) return window.SWEEP.crypto;
+  try {
+    const [shaMod, ripMod, secpMod] = await Promise.all([
+      import('https://esm.sh/@noble/hashes/sha256'),
+      import('https://esm.sh/@noble/hashes/ripemd160'),
+      import('https://esm.sh/@noble/curves/secp256k1')
+    ]);
+    window.SWEEP.crypto = { sha: shaMod.sha256, rip: ripMod.ripemd160, secp: secpMod.secp256k1 };
+    log('◊ sweep crypto WARM · @noble libs pre-loaded', 'log-good');
+    sweepRenderStatus();
+    return window.SWEEP.crypto;
+  } catch(e) {
+    log('sweep crypto warm failed: ' + e.message + ' (will retry on key find)', 'log-warn');
+    return null;
+  }
+}
+
+// Pre-fetch UTXOs at active puzzle address (every 30s while running)
+// BTC puzzle addresses are canonical P2PKH (compressed-form) at the published
+// address. We just probe the target_addr field directly — that IS the live
+// funded address. Cached UTXOs survive until the moment sweep fires.
+async function sweepWarmUtxos() {
+  const p = activePuzzle();
+  if (!p || !p.target_addr) return;
+  try {
+    const r = await fetch('https://mempool.space/api/address/' + p.target_addr + '/utxo', { cache: 'no-store' });
+    if (!r.ok) return;
+    const u = await r.json();
+    if (Array.isArray(u) && u.length) {
+      window.SWEEP.utxos = u;
+      window.SWEEP.utxosTs = Date.now();
+      window.SWEEP.utxosFundedAddr = p.target_addr;
+      window.SWEEP.utxosFundedType = 'p2pkh';
+      sweepRenderStatus();
+    }
+  } catch(_){}
+}
+
+// Pre-fetch fastest fee rate (every 60s)
+async function sweepWarmFee() {
+  try {
+    const r = await (await fetch('https://mempool.space/api/v1/fees/recommended', { cache: 'no-store' })).json();
+    if (r && typeof r.fastestFee === 'number') {
+      window.SWEEP.feeRate = r.fastestFee;
+      window.SWEEP.feeTs = Date.now();
+    }
+  } catch(_){}
+}
+
+// ◊·κ THE FAST SWEEP · key → signed tx → broadcast · sub-second when warm
+async function fastSweep(privateKeyBigInt, puzzleId) {
+  const S = window.SWEEP;
+  if (S.swept) { log('sweep · already executed · idempotent', 'log-info'); return null; }
+  if (!S.destination) {
+    log('sweep · NO PRIMED DESTINATION · key shown below for manual import', 'log-hot');
+    log('  hex: ' + privateKeyBigInt.toString(16).padStart(64, '0'), 'log-hot');
+    return null;
+  }
+  const t0 = performance.now();
+  log('◊ FAST SWEEP starting · destination ' + S.destination.slice(0, 10) + '... · libs ' + (S.crypto ? 'WARM' : 'COLD') + ' · UTXOs ' + (S.utxos ? S.utxos.length : 'NOT CACHED'), 'log-hot');
+  const c = S.crypto || await sweepWarmCrypto();
+  if (!c) { log('sweep · crypto unavailable · key: ' + privateKeyBigInt.toString(16), 'log-hot'); return null; }
+  const privBytes = _htb(privateKeyBigInt.toString(16).padStart(64, '0'));
+  const addrs = _deriveAllAddrs(privBytes, c.sha, c.rip, c.secp);
+  log('sweep · derived addresses · ' + addrs.p2pkh_c + ' (compressed) · ' + addrs.p2pkh_u + ' (uncompressed)', 'log-info');
+
+  // Re-verify UTXOs at funded address (cache might be stale)
+  // BTC PUZZLE FACT: keys derive to the COMPRESSED P2PKH form (verified vs puzzles 1, 130).
+  // Try compressed first · uncompressed only as fallback.
+  let utxos = S.utxos;
+  let fundedType = 'p2pkh';
+  let pubKey = addrs.pubC;  // BTC puzzles use COMPRESSED P2PKH
+  if (S.utxosFundedAddr !== addrs.p2pkh_c && S.utxosFundedAddr !== addrs.p2pkh_u) {
+    // Fall back to live fetch of all 4 formats — compressed first
+    const tries = [
+      { addr: addrs.p2pkh_c, type: 'p2pkh', pub: addrs.pubC },   // canonical for BTC puzzles
+      { addr: addrs.p2wpkh,  type: 'p2wpkh', pub: addrs.pubC },
+      { addr: addrs.p2sh,    type: 'p2sh',   pub: addrs.pubC },
+      { addr: addrs.p2pkh_u, type: 'p2pkh', pub: addrs.pubU }    // fallback only
+    ];
+    for (const tt of tries) {
+      try {
+        const r = await fetch('https://mempool.space/api/address/' + tt.addr + '/utxo', { cache: 'no-store' });
+        if (!r.ok) continue;
+        const u = await r.json();
+        if (Array.isArray(u) && u.length) {
+          utxos = u; fundedType = tt.type; pubKey = tt.pub;
+          log('sweep · funds at ' + tt.addr + ' (' + tt.type + ') · ' + u.length + ' UTXOs', 'log-good');
+          break;
+        }
+      } catch(_){}
+    }
+  } else if (S.utxosFundedAddr === addrs.p2pkh_u) {
+    pubKey = addrs.pubU;
+  }
+  if (!utxos || !utxos.length) {
+    log('sweep · NO UTXOs FOUND · funds may have moved · key for manual: ' + privateKeyBigInt.toString(16), 'log-hot');
+    return null;
+  }
+  const totalSats = utxos.reduce((s, u) => s + u.value, 0);
+  const feeRate = Math.max(30, S.feeRate);  // floor at 30 sat/vB for safety
+  const estVsize = 10 + 148 * utxos.length + 34;  // single output
+  const fee = estVsize * feeRate;
+  const sendSats = totalSats - fee;
+  if (sendSats < 546) { log('sweep · insufficient after fee', 'log-hot'); return null; }
+  log('sweep · total ' + (totalSats/1e8).toFixed(8) + ' BTC · fee ' + fee + ' sats @ ' + feeRate + ' sat/vB · sending ' + (sendSats/1e8).toFixed(8) + ' BTC', 'log-gold');
+
+  // Build single-output tx to primed destination
+  const destScript = _addr2script(S.destination, c.sha);
+  const outputs = [{ value: sendSats, script: destScript }];
+  let rawTx;
+  try {
+    rawTx = _buildSignedTx(utxos, outputs, privBytes, pubKey, c.sha, c.rip, c.secp);
+  } catch(e) {
+    log('sweep · build error: ' + e.message + ' · key for manual: ' + privateKeyBigInt.toString(16), 'log-hot');
+    return null;
+  }
+  const rawHex = _bth(rawTx);
+  const buildMs = (performance.now() - t0).toFixed(0);
+  log('◊ sweep · signed in ' + buildMs + 'ms · tx size ' + rawTx.length + ' bytes', 'log-good');
+
+  // Auto-broadcast or surface for one click
+  if (S.auto) {
+    try {
+      const r = await fetch('https://mempool.space/api/tx', { method: 'POST', body: rawHex });
+      if (r.ok) {
+        const txid = await r.text();
+        S.swept = true;
+        const totalMs = (performance.now() - t0).toFixed(0);
+        log('◊◊◊ SWEPT in ' + totalMs + 'ms · txid ' + txid, 'log-good');
+        log('  https://mempool.space/tx/' + txid, 'log-info');
+        sweepRenderStatus();
+        return { txid, rawHex, sendSats, fee };
+      } else {
+        const err = await r.text();
+        log('sweep · broadcast FAILED: ' + err + ' · raw tx available below', 'log-hot');
+      }
+    } catch(e) {
+      log('sweep · broadcast error: ' + e.message, 'log-hot');
+    }
+  }
+
+  // Surface one-click broadcast button
+  const div = document.createElement('div');
+  div.style.cssText = 'margin:12px 0;padding:18px;background:var(--surface);border:3px solid var(--green);border-radius:8px;box-shadow:0 0 24px rgba(68,170,68,0.5)';
+  div.innerHTML = '<div style="color:var(--green);font-size:1.3em;font-weight:bold;margin-bottom:8px">◊ PRIORITY SWEEP READY · ' + (sendSats/1e8).toFixed(8) + ' BTC to ' + S.destination.slice(0,10) + '...' + S.destination.slice(-8) + '</div>'
+    + '<div style="font-size:0.85em;color:var(--muted);margin-bottom:14px">fee ' + fee + ' sats @ ' + feeRate + ' sat/vB · signed in ' + buildMs + 'ms · ' + rawTx.length + ' bytes</div>'
+    + '<button id="btnPrioritySweep" style="background:var(--green);color:#000;border:none;padding:14px 40px;border-radius:5px;font-weight:bold;cursor:pointer;font-size:1.2em">BROADCAST NOW</button>'
+    + '<button id="btnCopyPrioritySweep" style="background:var(--surface-2);color:var(--ink);border:1px solid rgba(255,255,255,0.08);padding:14px 20px;border-radius:5px;cursor:pointer;margin-left:10px">Copy Hex</button>';
+  document.body.insertBefore(div, document.body.firstChild);
+  document.getElementById('btnPrioritySweep').onclick = async () => {
+    const btn = document.getElementById('btnPrioritySweep');
+    btn.disabled = true; btn.textContent = 'Broadcasting...';
+    try {
+      const r = await fetch('https://mempool.space/api/tx', { method: 'POST', body: rawHex });
+      if (r.ok) {
+        const txid = await r.text();
+        S.swept = true;
+        log('◊◊◊ SWEPT · txid ' + txid, 'log-good');
+        log('  https://mempool.space/tx/' + txid, 'log-info');
+        btn.textContent = 'SENT · ' + txid.slice(0, 16) + '...';
+        btn.style.background = '#2a2';
+        sweepRenderStatus();
+      } else {
+        const err = await r.text();
+        log('sweep broadcast failed: ' + err, 'log-hot');
+        btn.textContent = 'Failed · Retry'; btn.disabled = false;
+      }
+    } catch(e) {
+      log('sweep broadcast error: ' + e.message, 'log-hot');
+      btn.textContent = 'Error · Retry'; btn.disabled = false;
+    }
+  };
+  document.getElementById('btnCopyPrioritySweep').onclick = () => {
+    navigator.clipboard.writeText(rawHex);
+    document.getElementById('btnCopyPrioritySweep').textContent = 'Copied!';
+  };
+  return { txid: null, rawHex, sendSats, fee };
+}
+window.fastSweep = fastSweep;
+
+// Wire UI handlers on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function(){
+  sweepLoadDest();
+  const btnPrime = document.getElementById('btnPrimeSweep');
+  if (btnPrime) btnPrime.addEventListener('click', function(){
+    const v = document.getElementById('sweepDest').value.trim();
+    if (!sweepValidateAddr(v)) { log('sweep · invalid destination address', 'log-hot'); return; }
+    window.SWEEP.destination = v;
+    try { localStorage.setItem('cassie_sweep_dest', v); } catch(_){}
+    log('◊ sweep wallet PRIMED · destination ' + v, 'log-good');
+    sweepRenderStatus();
+    // Warm crypto + utxos + fee in parallel right now so the moment is instant
+    sweepWarmCrypto();
+    sweepWarmUtxos();
+    sweepWarmFee();
+  });
+  const chkAuto = document.getElementById('sweepAuto');
+  if (chkAuto) chkAuto.addEventListener('change', function(){
+    window.SWEEP.auto = chkAuto.checked;
+    try { localStorage.setItem('cassie_sweep_auto', chkAuto.checked ? '1' : '0'); } catch(_){}
+    sweepRenderStatus();
+  });
+});
+
+// Periodic refresh while running — keeps UTXOs + fee warm
+setInterval(function(){ if (window.running && window.SWEEP.destination) sweepWarmUtxos(); }, 30000);
+setInterval(function(){ if (window.running) sweepWarmFee(); }, 60000);
+
 // ◊ FOLD MECHANICS — matryoshka layer progression
 // ═══════════════════════════════════════════════════════════════
 function onCollisionFound(privateKey, puzzleId) {
@@ -3038,6 +3327,19 @@ function onCollisionFound(privateKey, puzzleId) {
 
   log('COLLISION / puzzle ' + puzzleId + ' SOLVED / key ' + privateKey.toString(16).slice(0, 20) + '...', 'log-hot');
   celebrateSolve(puzzleId);
+
+  // ◊·κ PRIORITY SWEEP · fire immediately · this is the 60-second window
+  // If wallet primed, builds + signs single-output tx to destination · auto-broadcasts if enabled
+  // If not primed, surfaces key for manual import
+  try {
+    fastSweep(privateKey, puzzleId).then(function(result){
+      if (result && result.txid) {
+        log('◊ PRIZE SECURED · ' + (result.sendSats/1e8).toFixed(8) + ' BTC en route to primed wallet · ' + result.txid, 'log-hot');
+      }
+    }).catch(function(e){
+      log('sweep error: ' + e.message + ' · key: ' + privateKey.toString(16), 'log-hot');
+    });
+  } catch(e) { log('sweep exception: ' + e.message, 'log-hot'); }
 
   // ◊·κ B6 — Matryoshka chain: ripple to Oracle, KCC, FallSignal
   try {
@@ -3773,6 +4075,11 @@ btnStart.addEventListener('click', async () => {
     await createPipeline();
     log('', 'log-info'); log('Torus solver started. Layer A grinding. Layer B listening.', 'log-gold'); log('', 'log-info');
     running = true; totalOps = 0; dispatchCount = 0;
+    // ◊·κ PRE-WARM SWEEP · crypto libs + UTXOs + fee in parallel so the moment is instant
+    Promise.all([sweepWarmCrypto(), sweepWarmUtxos(), sweepWarmFee()]).then(function(){
+      if (window.SWEEP.destination) log('◊ sweep stack warm · ready to fire in sub-second', 'log-good');
+      else log('◊ sweep crypto warm · NO destination primed — prime your cold wallet for auto-sweep', 'log-warn');
+    }).catch(function(e){ log('sweep warm failed: ' + e.message, 'log-warn'); });
     mainLoop();
   } catch(e) {
     showError('Init failed: ' + e.message); log(e.stack, 'log-hot');
