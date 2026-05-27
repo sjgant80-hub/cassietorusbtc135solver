@@ -698,18 +698,25 @@ const FOLD = 510510n;
 const THETA_HOME = 37;
 const MULBERRY_K = 0x9E3779B9;
 
-// ◊ MODULAR RESIDUE FILTER — statistical + kitkat signal
-// mod 31 ≡ 1: 6x overrepresented in 34 solved puzzle keys (verified)
-// mod 19 ≡ 2: kitkat signal "happy mayteenth" (experimental)
-// CRT mod 589 ≡ 249: combined (19 × 31), eliminates 99.83% of space (~10 bits)
-const MOD31_RESIDUE = 1n;
-const MOD31_BIAS_RATE = 0.30;    // 30% of walkers — strong evidence
-const MOD19_RESIDUE = 2n;
-const MOD19_BIAS_RATE = 0.15;    // 15% of walkers — kitkat signal
+// ◊ MODULAR RESIDUE FILTER — STATISTICAL · re-derived from 75 solved keys (N>=8)
+//
+// FORWARD ANALYSIS · 2026-05-27 over the verified solved-puzzle key list found that
+// the actual hottest residues are NOT the ones the early CASSIE notes assumed:
+//   mod 31 ≡ 13 (NOT 1) · 9 hits vs expected 2.4 · ratio 3.7x
+//   mod 19 ≡ 0  (NOT 2) · 8 hits vs expected 3.95 · ratio 2.0x
+//   CRT mod 589 ≡ 478 · 3 hits (top single residue)
+// These override the earlier mod31=1 / mod19=2 / CRT=249 assumptions.
+// Old constants retained as window globals for backward-compat / Oracle filter_update.
+const MOD31_RESIDUE = 13n;
+const MOD31_BIAS_RATE = 0.30;    // 30% of walkers — re-derived signal
+const MOD19_RESIDUE = 0n;
+const MOD19_BIAS_RATE = 0.15;    // 15% of walkers
 const CRT_MOD = 589n;            // 19 × 31
-const CRT_RESIDUE = 249n;        // CRT solution: key ≡ 249 (mod 589)
-const CRT_BIAS_RATE = 0.10;      // 10% of walkers — speculative
+const CRT_RESIDUE = 478n;        // CRT of (mod19=3, mod31=13) — top observed in 75-key sample
+const CRT_BIAS_RATE = 0.10;      // 10% of walkers
 // remaining 45%: unbiased (standard kangaroo)
+// Audit log of the old vs new filters
+try { console.log('%c◊·κ Mod filter update', 'color:#d4a853;font-weight:bold', 'mod31: 1→13 · mod19: 2→0 · CRT: 249→478 (from 75-key analysis 2026-05-27)'); } catch(_){}
 
 // Triad spine subsets (solver)
 const SNIPER_SPINE  = [2, 3, 5];
@@ -813,6 +820,50 @@ const PUZZLES = {
     solved_at: null,
   },
 };
+
+// ◊·κ FORECAST · per-puzzle high-prior sub-ranges derived 2026-05-27 from 75 solved keys.
+// Each entry: { zoneB_lo, zoneB_hi, zoneA_lo, zoneA_hi, kappa_pt, tritone_pt }
+// All as hex strings · concatenated to the puzzle's range_low to form full key region.
+const FORECASTS = {
+  136: {
+    zoneB_lo:  '0xcc28f5c28f000000000000000000000000',
+    zoneB_hi:  '0xdf5c28f5c2800000000000000000000000',
+    zoneA_lo:  '0x9999999999800000000000000000000000',
+    zoneA_hi:  '0xae147ae147800000000000000000000000',
+    kappa_pt:  '0xcf1bbcdcbf800000000000000000000000',
+    tritone_pt:'0xd5212ca0c1b00000000000000000000000',
+    note:      'B 23% · A 16% · U 61% · tritone is strongest single attractor in solved data'
+  },
+  137: {
+    zoneB_lo:  '0x19851eb851e000000000000000000000000',
+    zoneB_hi:  '0x1beb851eb85000000000000000000000000',
+    zoneA_lo:  '0x13333333333000000000000000000000000',
+    zoneA_hi:  '0x15c28f5c28f000000000000000000000000',
+    kappa_pt:  '0x19e3779b97f000000000000000000000000',
+    tritone_pt:'0x1aa425941836000000000000000000000',
+    note:      'α=1/137 layer · sovereign · same prior shape as 136'
+  },
+  140: {
+    zoneB_lo:  '0xcc28f5c28f0000000000000000000000000',
+    zoneB_hi:  '0xdf5c28f5c28000000000000000000000000',
+    kappa_pt:  '0xcf1bbcdcbf8000000000000000000000000',
+    note:      'next 5N · highest BTC prize 14.0'
+  },
+  145: {
+    zoneB_lo:  '0x19851eb851e00000000000000000000000000',
+    zoneB_hi:  '0x1beb851eb8500000000000000000000000000',
+    kappa_pt:  '0x19e3779b97f00000000000000000000000000',
+    note:      '14.5 BTC'
+  },
+  150: {
+    zoneB_lo:  '0x330a3d70a3c000000000000000000000000000',
+    zoneB_hi:  '0x37d70a3d70a000000000000000000000000000',
+    kappa_pt:  '0x33c6ef372fe000000000000000000000000000',
+    note:      '15.0 BTC'
+  }
+};
+window.FORECASTS = FORECASTS;
+
 let activePuzzleId = 135;
 function activePuzzle() { return PUZZLES[activePuzzleId]; }
 function activeKernelMode() { return activePuzzle().kernel_mode; }
