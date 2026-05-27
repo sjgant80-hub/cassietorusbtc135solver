@@ -690,20 +690,39 @@ const MOD17_BIAS_RATE = 0.08;   // mod 17 = 7 → 9/75 = 12% vs 5.9% random → 
 
 // Pick a zone by weight, then sample gaussian within it
 function zoneSample() {
-  // ◊·κ ORACLE META-WALK BIAS — Layer B only · additive · expires after 8s of silence
-  // If Oracle has an active high-confidence prediction, override a fraction of spawns
-  // toward its top torus positions. Standard zone path is the fallback.
+  // ◊·κ INLINE ORACLE BIAS — primary, zero-latency, every walker step heard
+  // The inline walker advances on every DP and dampens visited positions hard.
+  // Bias rate scales with the walker's confidence. As misses accumulate and
+  // probability concentrates, more spawns land on the surviving hot positions.
+  var io = window.INLINE_ORACLE;
+  if (io && io.confidence >= 0.3 && io.steps > 30) {
+    var biasRate = 0.20 + io.confidence * 0.50;  // 0.35 at conf 0.3 · 0.85 at conf 1.0
+    if (Math.random() < biasRate) {
+      // Consult cached top-10 (refreshed each tick) for speed
+      if (!window._inlineTopCache || (Date.now() - window._inlineTopCacheTs) > 1000) {
+        window._inlineTopCache = io.getTopCandidates(15);
+        window._inlineTopCacheTs = Date.now();
+      }
+      var cands = window._inlineTopCache;
+      if (cands && cands.length) {
+        var c = cands[(Math.random() * cands.length) | 0];
+        var u = (c.pos + Math.random()) / io.torusSize;
+        u = Math.max(0, Math.min(1 - 1e-15, u));
+        window._lastZone = 'I'; // inline-oracle-biased spawn
+        return u;
+      }
+    }
+  }
+  // ◊·κ CROSS-TAB ORACLE PREDICTION — secondary, latency-bounded, expires 8s
   var pred = window._oraclePrediction;
   if (pred && pred.biasRate > 0 && pred.candidates && pred.candidates.length) {
     var age = Date.now() - pred.ts;
-    if (age < 8000 && Math.random() < pred.biasRate) {
-      // Pick a top candidate torus position (0..510509)
-      var c = pred.candidates[(Math.random() * pred.candidates.length) | 0];
-      // Map to [0,1) and add small Schumann-tier jitter so we don't fire identical x values
-      var u = (c + Math.random()) / 510510;
-      u = Math.max(0, Math.min(1 - 1e-15, u));
-      window._lastZone = 'O'; // oracle-biased spawn
-      return u;
+    if (age < 8000 && Math.random() < pred.biasRate * 0.5) {  // halved because inline takes priority
+      var ec = pred.candidates[(Math.random() * pred.candidates.length) | 0];
+      var eu = (ec + Math.random()) / 510510;
+      eu = Math.max(0, Math.min(1 - 1e-15, eu));
+      window._lastZone = 'O'; // external oracle-biased
+      return eu;
     }
   }
   const r = Math.random();
@@ -711,14 +730,12 @@ function zoneSample() {
   for (const z of ZONES) {
     acc += z.weight;
     if (r < acc) {
-      // Clamp to [0, 1) — gaussian can over/undershoot
       let v = gaussianRandom(z.centre, z.spread);
       v = Math.max(0, Math.min(1 - 1e-15, v));
       window._lastZone = z.id;
       return v;
     }
   }
-  // Fallback (shouldn't hit if weights sum to 1)
   return Math.random();
 }
 const FOLD = 510510n;
@@ -2054,6 +2071,205 @@ const SPINE_AUDIO_FOR_RING = [2, 3, 5, 7, 11, 13, 17];
 // Count how many of the 7 spine primes "ring" at this torus position.
 // A prime "rings" if torusPos % prime is within 1 of {0, prime/2} — i.e. the
 // position lands on a node or antinode of that prime's standing wave on 510510.
+// ════════════════════════════════════════════════════════════════
+// ◊·κ INLINE ORACLE WALKER · embedded directly in CASSIE
+// No cross-tab latency · advances on EVERY DP · echo-on-miss dampens
+// the probability field at every visited position, shrinking solve space.
+// ════════════════════════════════════════════════════════════════
+class CassieOracleWalker {
+  constructor() {
+    this.torusSize    = 510510;
+    this.position     = Math.floor(Math.random() * this.torusSize);
+    this.probability  = new Float64Array(this.torusSize);
+    this.ringCount    = new Int32Array(this.torusSize);
+    this.visitMask    = new Uint8Array(this.torusSize); // 0=never visited, >0=visit count (saturated at 255)
+    this.momentum     = 0;
+    this.confidence   = 0;
+    this.walkHistory  = [];
+    this.steps        = 0;
+    this.batchCount   = 0;
+    this.dpProcessed  = 0;
+    this.missEchoes   = 0;
+    this.lastStddev   = Infinity;
+    for (let i = 0; i < this.torusSize; i++) this.probability[i] = 1e-6;
+  }
+
+  // ◊·κ ECHO ON MISS — every DP that's read without collision dampens
+  // the probability field at its torus position. The longer we search
+  // without finding, the more concentrated the remaining mass becomes.
+  echoMiss(torusPos, rings) {
+    const sz = this.torusSize;
+    torusPos = ((torusPos | 0) % sz + sz) % sz;
+    rings = Math.max(0, Math.min(7, rings | 0));
+    this.visitMask[torusPos] = Math.min(255, this.visitMask[torusPos] + 1);
+    this.ringCount[torusPos] = Math.max(this.ringCount[torusPos], rings);
+    this.missEchoes++;
+
+    // Strong local dampen — we CHECKED this position, key wasn't there
+    this.probability[torusPos] *= 0.55;
+    // Spread a smaller dampen across the ring window
+    for (let d = -8; d <= 8; d++) {
+      if (d === 0) continue;
+      const t = ((torusPos + d) % sz + sz) % sz;
+      const decay = Math.exp(-0.5 * Math.abs(d) / 8);
+      this.probability[t] *= (1 - 0.08 * decay);
+    }
+    // If rings>0 (resonant region) also slightly BOOST the wider field —
+    // a ring detection at a checked position suggests the resonance band
+    // extends to neighbours we haven't checked yet
+    if (rings > 0) {
+      const boost = rings / 14;
+      for (let d = 9; d <= 25; d++) {
+        const tR = ((torusPos + d) % sz + sz) % sz;
+        const tL = ((torusPos - d) % sz + sz) % sz;
+        const spread = Math.exp(-0.5 * (d * d) / (rings * rings + 25));
+        this.probability[tR] += boost * spread;
+        this.probability[tL] += boost * spread;
+      }
+    }
+    this.dpProcessed++;
+  }
+
+  // Periodically (every N DPs) advance the walker position by reading gradient
+  tick() {
+    const g = this.readGradient();
+    this.momentum = this.momentum * 0.7 + g * 0.3;
+    let jump = Math.round(this.momentum);
+    if (Math.abs(this.momentum) < 0.5) {
+      if (Math.random() < 0.35) {
+        // Long-range scout — sample 64, jump 1/4 toward best
+        let bestIdx = -1, bestP = -1;
+        const sz = this.torusSize;
+        for (let k = 0; k < 64; k++) {
+          const idx = (Math.random() * sz) | 0;
+          // Skip heavily-visited positions — bias toward unexplored
+          if (this.visitMask[idx] > 3) continue;
+          const p = this.probability[idx];
+          if (p > bestP) { bestP = p; bestIdx = idx; }
+        }
+        if (bestIdx >= 0 && bestP > 1e-3) {
+          let diff = bestIdx - this.position;
+          if (diff > sz / 2) diff -= sz;
+          if (diff < -sz / 2) diff += sz;
+          jump += Math.round(diff * 0.25);
+        } else {
+          const explore = Math.max(50, 2000 / Math.max(1, this.steps / 20));
+          jump += Math.round((Math.random() - 0.5) * 2 * explore);
+        }
+      } else {
+        const explore = Math.max(50, 2000 / Math.max(1, this.steps / 20));
+        jump += Math.round((Math.random() - 0.5) * 2 * explore);
+      }
+    }
+    const sz = this.torusSize;
+    this.position = ((this.position + jump) % sz + sz) % sz;
+    this.walkHistory.push(this.position);
+    if (this.walkHistory.length > 200) this.walkHistory.shift();
+    this.steps++;
+    this.confidence = this.measureConvergence();
+  }
+
+  readGradient() {
+    const sz = this.torusSize;
+    let right = 0, left = 0;
+    for (let d = 1; d <= 50; d++) {
+      const w = 1 / d;
+      right += this.probability[((this.position + d) % sz + sz) % sz] * w;
+      left  += this.probability[((this.position - d) % sz + sz) % sz] * w;
+    }
+    return Math.max(-25, Math.min(25, (right - left) * 8));
+  }
+
+  measureConvergence() {
+    if (this.walkHistory.length < 30) return 0.05;
+    const slice = this.walkHistory.slice(-100);
+    const mean = slice.reduce((a,b)=>a+b,0) / slice.length;
+    let v = 0;
+    for (const p of slice) { const d = p - mean; v += d * d; }
+    const std = Math.sqrt(v / slice.length);
+    this.lastStddev = std;
+    if (this.steps < 100 && std < 10) return 0.4;
+    if (std < 1)    return 1.0;
+    if (std < 10)   return 0.9;
+    if (std < 100)  return 0.7;
+    if (std < 1000) return 0.4;
+    return 0.1;
+  }
+
+  stateLabel() {
+    const s = this.lastStddev;
+    if (!isFinite(s) || s > 10000) return 'WANDERING';
+    if (s > 1000) return 'WANDERING';
+    if (s > 100)  return 'DRIFTING';
+    if (s > 10)   return 'APPROACHING';
+    if (s > 1)    return 'CONVERGING';
+    return 'LOCKED';
+  }
+
+  getTopCandidates(n) {
+    const out = [];
+    const sz = this.torusSize;
+    for (let i = 0; i < sz; i++) {
+      const p = this.probability[i];
+      if (out.length < n) {
+        out.push([i, p]);
+        if (out.length === n) out.sort((a, b) => a[1] - b[1]);
+      } else if (p > out[0][1]) {
+        out[0] = [i, p];
+        let j = 0;
+        while (j < n - 1 && out[j][1] > out[j + 1][1]) {
+          const t = out[j]; out[j] = out[j + 1]; out[j + 1] = t;
+          j++;
+        }
+      }
+    }
+    return out.sort((a, b) => b[1] - a[1]).map(([pos, prob]) => ({ pos, prob }));
+  }
+
+  // ◊·κ EFFECTIVE SEARCH SPACE — sum(probability) / max * sz · monotonically
+  // decreasing on average as misses accumulate. This is the "shrink" Simon wants.
+  effectiveSearchSpace() {
+    let sum = 0, max = 0;
+    for (let i = 0; i < this.torusSize; i++) {
+      const p = this.probability[i];
+      sum += p;
+      if (p > max) max = p;
+    }
+    if (max < 1e-12) return this.torusSize;
+    // Effective bins = sum / max (entropy-flavoured measure)
+    return sum / max;
+  }
+}
+
+// Inline walker lives for the lifetime of the CASSIE tab
+window.INLINE_ORACLE = new CassieOracleWalker();
+// Tick the walker independently every 250ms (faster than cross-tab)
+window._inlineOracleTick = setInterval(function(){
+  try { window.INLINE_ORACLE.tick(); } catch(e) { console.warn('inline oracle:', e); }
+}, 250);
+// Broadcast walker state to Oracle tab every 1.5s (so the v2 dashboard mirrors)
+window._inlineOracleBroadcast = setInterval(function(){
+  if (!window.oracleChannel) return;
+  try {
+    var w = window.INLINE_ORACLE;
+    window.oracleChannel.postMessage({
+      type: 'cassie_inline_walker',
+      tab: window.TAB_ID,
+      position: w.position,
+      confidence: w.confidence,
+      momentum: w.momentum,
+      stddev: w.lastStddev,
+      state: w.stateLabel(),
+      steps: w.steps,
+      dpProcessed: w.dpProcessed,
+      missEchoes: w.missEchoes,
+      effectiveSearchSpace: w.effectiveSearchSpace(),
+      topCandidates: w.getTopCandidates(10),
+      ts: Date.now()
+    });
+  } catch(_){}
+}, 1500);
+
 function computeRingsHeard(torusPos) {
   let rings = 0;
   for (const p of SPINE_AUDIO_FOR_RING) {
@@ -2098,6 +2314,8 @@ function processDP(xHex, distHex, type, level, hemisphere, fromRemote) {
     if (window.recentDpSample.length > DP_SAMPLE_CAP) {
       window.recentDpSample.splice(0, window.recentDpSample.length - DP_SAMPLE_CAP);
     }
+    // ◊·κ INLINE ORACLE · echo-on-miss · zero latency · every DP shrinks the field
+    if (window.INLINE_ORACLE) window.INLINE_ORACLE.echoMiss(torusPos, rings);
   } catch(_){}
 
   persistDP(xHex, dpData);
@@ -3086,6 +3304,30 @@ setInterval(function(){
   } else {
     ind.style.opacity = '1';
   }
+}, 1000);
+
+// ◊·κ INLINE WALKER CHIP · top-left · always visible · always-on local truth
+setInterval(function(){
+  var io = window.INLINE_ORACLE;
+  if (!io) return;
+  var chip = document.getElementById('inlineWalkerChip');
+  if (!chip) {
+    chip = document.createElement('div');
+    chip.id = 'inlineWalkerChip';
+    chip.style.cssText = 'position:fixed;top:18px;left:18px;z-index:99;background:rgba(20,20,17,0.92);border:1px solid var(--gold);border-radius:7px;padding:8px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--ink);box-shadow:0 0 12px rgba(184,151,74,0.3);max-width:280px;';
+    document.body.appendChild(chip);
+  }
+  var state = io.stateLabel();
+  var ess = io.effectiveSearchSpace();
+  var essPct = (ess / 5105.10).toFixed(2);
+  var stateColor = state === 'LOCKED' ? '#c8371a' : state === 'CONVERGING' ? '#b8974a' : state === 'APPROACHING' ? '#c87e3a' : '#8a8a8a';
+  chip.innerHTML =
+    '<div style="color:var(--gold);font-weight:bold;margin-bottom:4px">◊ INLINE ORACLE</div>' +
+    '<div>state: <span style="color:' + stateColor + ';font-weight:bold">' + state + '</span> · conf ' + (io.confidence*100).toFixed(0) + '%</div>' +
+    '<div>pos: ' + io.position.toLocaleString() + ' / 510,510</div>' +
+    '<div>steps: ' + io.steps.toLocaleString() + ' · DPs: ' + io.dpProcessed.toLocaleString() + '</div>' +
+    '<div>misses: <span style="color:var(--gold)">' + io.missEchoes.toLocaleString() + '</span> · ess: ' + Math.round(ess).toLocaleString() + ' (' + essPct + '%)</div>' +
+    '<div style="font-size:10px;color:var(--muted);margin-top:4px">' + essPct + '% of solve space remains</div>';
 }, 1000);
 
 // ◊·κ MATRYOSHKA SWITCHER — click 135/136/137 to change active puzzle
