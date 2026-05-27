@@ -3608,7 +3608,55 @@ setInterval(function(){
   }
 }, 1000);
 
-// ◊·κ INLINE WALKER CHIP · top-left · always visible · always-on local truth
+// ◊·κ DRAGGABLE CHIP HELPER · click + drag any chip with class fall-drag · persists position
+function makeDraggable(el, storageKey) {
+  if (el._draggable) return;
+  el._draggable = true;
+  el.style.cursor = 'move';
+  el.style.userSelect = 'none';
+  // Restore saved position
+  try {
+    var saved = JSON.parse(localStorage.getItem('cassie_chip_' + storageKey) || 'null');
+    if (saved && typeof saved.left === 'number' && typeof saved.top === 'number') {
+      el.style.left = saved.left + 'px';
+      el.style.top  = saved.top  + 'px';
+      el.style.right = 'auto';
+      el.style.bottom = 'auto';
+    }
+  } catch(_){}
+  var ox = 0, oy = 0, dragging = false;
+  el.addEventListener('mousedown', function(e){
+    // Don't drag on clicks inside inputs / buttons inside the chip
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'A') return;
+    var r = el.getBoundingClientRect();
+    ox = e.clientX - r.left;
+    oy = e.clientY - r.top;
+    dragging = true;
+    el.style.transition = 'none';
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', function(e){
+    if (!dragging) return;
+    var nl = Math.max(0, Math.min(window.innerWidth  - 50, e.clientX - ox));
+    var nt = Math.max(0, Math.min(window.innerHeight - 30, e.clientY - oy));
+    el.style.left  = nl + 'px';
+    el.style.top   = nt + 'px';
+    el.style.right = 'auto';
+    el.style.bottom = 'auto';
+  });
+  document.addEventListener('mouseup', function(){
+    if (!dragging) return;
+    dragging = false;
+    try {
+      localStorage.setItem('cassie_chip_' + storageKey, JSON.stringify({
+        left: parseInt(el.style.left, 10) || 0,
+        top:  parseInt(el.style.top,  10) || 0
+      }));
+    } catch(_){}
+  });
+}
+
+// ◊·κ INLINE WALKER CHIP · top-left · always visible · DRAGGABLE
 setInterval(function(){
   var io = window.INLINE_ORACLE;
   if (!io) return;
@@ -3618,6 +3666,7 @@ setInterval(function(){
     chip.id = 'inlineWalkerChip';
     chip.style.cssText = 'position:fixed;top:18px;left:18px;z-index:99;background:rgba(20,20,17,0.92);border:1px solid var(--gold);border-radius:7px;padding:8px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--ink);box-shadow:0 0 12px rgba(184,151,74,0.3);max-width:280px;';
     document.body.appendChild(chip);
+    makeDraggable(chip, 'inlineWalker');
   }
   var state = io.stateLabel();
   var ess = io.effectiveSearchSpace();
@@ -4190,6 +4239,7 @@ window.addEventListener('resize', resizeCanvases);
               ind.id = 'oracleLinkIndicator';
               ind.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99;background:rgba(20,20,17,0.92);border:1px solid var(--gold);border-radius:7px;padding:6px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--gold);box-shadow:0 0 12px rgba(184,151,74,0.3);';
               document.body.appendChild(ind);
+              if (typeof makeDraggable === 'function') makeDraggable(ind, 'oracleLink');
             }
             var w = m.walker || {};
             ind.innerHTML = '◊ ORACLE LINKED · walker ' + (w.state || 'init') + ' · pos ' + (w.position || '—') + ' · conf ' + (w.confidence != null ? (w.confidence*100).toFixed(0) + '%' : '—');
