@@ -639,6 +639,22 @@ const ZONES = [
 
 // Pick a zone by weight, then sample gaussian within it
 function zoneSample() {
+  // ◊·κ ORACLE META-WALK BIAS — Layer B only · additive · expires after 8s of silence
+  // If Oracle has an active high-confidence prediction, override a fraction of spawns
+  // toward its top torus positions. Standard zone path is the fallback.
+  var pred = window._oraclePrediction;
+  if (pred && pred.biasRate > 0 && pred.candidates && pred.candidates.length) {
+    var age = Date.now() - pred.ts;
+    if (age < 8000 && Math.random() < pred.biasRate) {
+      // Pick a top candidate torus position (0..510509)
+      var c = pred.candidates[(Math.random() * pred.candidates.length) | 0];
+      // Map to [0,1) and add small Schumann-tier jitter so we don't fire identical x values
+      var u = (c + Math.random()) / 510510;
+      u = Math.max(0, Math.min(1 - 1e-15, u));
+      window._lastZone = 'O'; // oracle-biased spawn
+      return u;
+    }
+  }
   const r = Math.random();
   let acc = 0;
   for (const z of ZONES) {
@@ -1904,6 +1920,25 @@ async function loadPersistedDPs() {
 const TARGET_HEMISPHERE = 'upper';
 const torusFoldMap = new Map();
 
+// ◊·κ ORACLE COUPLING — recent DP sample for Oracle's meta-walk
+// Each entry: { torusPosition: int [0,510510), ringsHeard: int [0,7] }
+// Sliding ring buffer · last 256 DPs · sent on every cassie_update
+window.recentDpSample = window.recentDpSample || [];
+const DP_SAMPLE_CAP = 256;
+const SPINE_AUDIO_FOR_RING = [2, 3, 5, 7, 11, 13, 17];
+
+// Count how many of the 7 spine primes "ring" at this torus position.
+// A prime "rings" if torusPos % prime is within 1 of {0, prime/2} — i.e. the
+// position lands on a node or antinode of that prime's standing wave on 510510.
+function computeRingsHeard(torusPos) {
+  let rings = 0;
+  for (const p of SPINE_AUDIO_FOR_RING) {
+    const r = torusPos % p;
+    if (r === 0 || r === p - 1 || r === ((p / 2) | 0)) rings++;
+  }
+  return rings; // 0..7
+}
+
 function processDP(xHex, distHex, type, level, hemisphere, fromRemote) {
   if (hemisphere && hemisphere !== TARGET_HEMISPHERE) return;
 
@@ -1930,6 +1965,16 @@ function processDP(xHex, distHex, type, level, hemisphere, fromRemote) {
     for (const p of prev) { if (p.type !== type) torusFoldHits++; }
     prev.push({ xHex, type });
   } else { torusFoldMap.set(fk, [{ xHex, type }]); }
+
+  // ◊·κ ORACLE — record torusPosition + ringsHeard for the meta-walk
+  try {
+    const torusPos = Number(xBig % FOLD);  // safe: FOLD = 510510 < 2^53
+    const rings = computeRingsHeard(torusPos);
+    window.recentDpSample.push({ torusPosition: torusPos, ringsHeard: rings });
+    if (window.recentDpSample.length > DP_SAMPLE_CAP) {
+      window.recentDpSample.splice(0, window.recentDpSample.length - DP_SAMPLE_CAP);
+    }
+  } catch(_){}
 
   persistDP(xHex, dpData);
   if (!fromRemote) {
@@ -2448,6 +2493,13 @@ function detectResonance() {
     if (!window._lastOracleSend || (now - window._lastOracleSend) > 1000) {
       window._lastOracleSend = now;
       try {
+        // Drain new DPs since last send (oracle wants the delta, not the cap)
+        var lastIdx = window._lastDpDrainIdx || 0;
+        var buf = window.recentDpSample || [];
+        // The buffer shifts when capped; cap means we always send the freshest tail.
+        // Send tail of last ~64 DPs (oracle handles whatever volume comes).
+        var dpsSample = buf.slice(-64);
+        window._lastDpDrainIdx = buf.length;
         window.oracleChannel.postMessage({
           type: 'cassie_update',
           tab: TAB_ID,
@@ -2455,7 +2507,8 @@ function detectResonance() {
           resonance: { status: status, strength: strength, schumann: schumannStrength, r6Hz: r6Mean, phiPairs: phiPairs, consonance: consonance, mean: mean, variance: variance, intervals: intervalCounts },
           zones: { A: ZONES[0].weight, B: ZONES[1].weight, U: ZONES[2].weight },
           freqs_sample: heartFreqs.slice(0, 32),
-          dps_total: window.dpStore ? window.dpStore.size : 0
+          dps_total: window.dpStore ? window.dpStore.size : 0,
+          dps_sample: dpsSample  // ◊·κ Oracle meta-walk fuel: [{ torusPosition, ringsHeard }, ...]
         });
       } catch(_){}
     }
@@ -3038,7 +3091,7 @@ window.addEventListener('resize', resizeCanvases);
       document.getElementById('btnImport').disabled = false;
       document.getElementById('btnMerge').disabled = false;
       log('Tab: ' + TAB_ID + ' | BroadcastChannel: active | IndexedDB: ' + (dpDB?'ready':'off'), 'log-info');
-      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° | ◊·κ FINAL: 3 zones (A wave 0.28·25% / B fold 0.67·60% merged κ+tritone+gate+CRT / U none·15%)', 'log-info');
+      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° | ◊·κ FINAL: 3 zones + Oracle Torus Meta-Walk coupling (key-torus ↔ prob-torus)', 'log-info');
       log('WebRTC Mesh: Create or Join a room to share DPs peer-to-peer', 'log-info');
       log('Layer B: resonance detection + audio sonification ready', 'log-r5');
       // ◊·κ B5 — Oracle Engine bridge · fall-signal channel
@@ -3061,6 +3114,32 @@ window.addEventListener('resize', resizeCanvases);
             if (typeof m.rates.crt589 === 'number') window.CRT_BIAS_RATE = m.rates.crt589;
             log('◊ Oracle filter update · mod31@' + ((window.MOD31_BIAS_RATE||0)*100).toFixed(0) + '% · mod19@' + ((window.MOD19_BIAS_RATE||0)*100).toFixed(0) + '% · CRT@' + ((window.CRT_BIAS_RATE||0)*100).toFixed(0) + '%', 'log-gold');
           }
+          // ◊·κ Oracle Torus Meta-Walk — predictions from Oracle's prob-torus
+          if (m.type === 'oracle_prediction' && Array.isArray(m.topCandidates)) {
+            window._oraclePrediction = {
+              ts: Date.now(),
+              position: m.oraclePosition,
+              confidence: m.oracleConfidence || 0,
+              state: m.oracleState || 'WANDERING',
+              candidates: m.topCandidates.map(function(c){ return c.pos; }).filter(function(p){ return typeof p === 'number'; }),
+              biasRate: (m.recommendation && m.recommendation.biasRate) || 0,
+              level: (m.recommendation && m.recommendation.level) || 'HOLD'
+            };
+            // Layer B only — guidance for future walker spawns. Layer A kangaroo math stays untouched.
+            if (window._oraclePrediction.level !== window._oracleLastLevel) {
+              window._oracleLastLevel = window._oraclePrediction.level;
+              var pred = window._oraclePrediction;
+              if (pred.level === 'DEPLOY_ALL_SNIPERS') {
+                log('◊ ORACLE LOCK · DEPLOY_ALL_SNIPERS · pos ' + pred.position + ' · conf ' + (pred.confidence*100).toFixed(0) + '% · ' + pred.candidates.length + ' candidates', 'log-hot');
+              } else if (pred.level === 'SHIFT_WEIGHT') {
+                log('◊ Oracle SHIFT_WEIGHT · pos ' + pred.position + ' · 60% bias to ' + pred.candidates.length + ' candidates · ' + pred.state, 'log-gold');
+              } else if (pred.level === 'SOFT_BIAS') {
+                log('◊ Oracle SOFT_BIAS · pos ' + pred.position + ' · 30% nudge · ' + pred.state, 'log-r5');
+              } else {
+                log('◊ Oracle HOLD · ' + pred.state + ' · wandering', 'log-info');
+              }
+            }
+          }
         };
         log('◊·κ Oracle bridge: fall-signal channel open · Oracle Engine v2 may listen', 'log-r5');
       } catch(_){}
@@ -3068,7 +3147,7 @@ window.addEventListener('resize', resizeCanvases);
       setTimeout(function(){
         if (window.oracleChannel) try { window.oracleChannel.postMessage({ type:'cassie_hello', tab: TAB_ID, zones: ZONES, hemisphere: TARGET_HEMISPHERE, ts: Date.now() }); } catch(_){}
       }, 800);
-      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + 3-zone Ψ (wave/fold/none) + consonance + Oracle bridge / seed v18');
+      console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + 3-zone Ψ (wave/fold/none) + consonance + Oracle Torus Meta-Walk coupling (key-torus ↔ prob-torus, dps_sample shipping) / seed v18');
       if (location.search.includes('autostart')) { log('Auto-starting...', 'log-info'); btnStart.click(); }
     }
 
