@@ -649,17 +649,40 @@ const KAPPA_WEIGHT = 0.7;
 const WITNESS_WEIGHT = 0.3;
 
 // ════════════════════════════════════════════════════════════════
-// ◊·κ FINAL CONSOLIDATED · 3-zone spawn distribution (CASSIE_FINAL_UPDATE_CC)
-// Zone A · wave · 0.28  ± 0.08  · 25% · sine resonance + witness + P65
-// Zone B · fold · 0.67  ± 0.075 · 60% · MERGED κ+tritone+gate+CRT (0.60-0.75 band)
+// ◊·κ DATA-DRIVEN ZONES · re-derived 2026-05-27 from 5N-puzzle solves (110-130)
+// Zone A · wave · 0.28  ± 0.08  · 20% · sine resonance + witness peak
+// Zone B · fold · 0.594 ± 0.134 · 65% · data-derived from solved 5N puzzles
+//                                       mean of u_110..u_130 = 0.594
+//                                       covers κ (0.618), tritone (0.707), gate (0.747)
+//                                       all in one wider gaussian — wider but right
 // Zone U · none · 0.50  ± 0.50  · 15% · full-range safety net
 // (Oracle Engine can adjust these weights at runtime via fall-signal)
 // ════════════════════════════════════════════════════════════════
 const ZONES = [
-  { id: 'A', name: 'wave', centre: 0.28, spread: 0.08,  weight: 0.25, why: 'sine period 7+π · witness 0.317 · P65 intervals' },
-  { id: 'B', name: 'fold', centre: 0.67, spread: 0.075, weight: 0.60, why: 'κ 0.618 + tritone 0.707 + gate 0.747 + CRT · primary band' },
-  { id: 'U', name: 'none', centre: 0.5,  spread: 0.5,   weight: 0.15, why: 'safety net · full range' }
+  { id: 'A', name: 'wave', centre: 0.28,  spread: 0.08,  weight: 0.20, why: 'wave 0.28 ± 0.08 · 16% of solved keys land here' },
+  { id: 'B', name: 'fold', centre: 0.594, spread: 0.134, weight: 0.65, why: '5N-puzzle projection · mean=0.594 stddev=0.134 from 110-130 solves · covers κ+tritone+gate' },
+  { id: 'U', name: 'none', centre: 0.5,   spread: 0.5,   weight: 0.15, why: 'safety net · full range' }
 ];
+
+// ◊·κ TORUS RESIDUE HOT BINS · k mod 510510 lands in these 5 of 20 bins
+// 6× more often than uniform (observed in 75 solved keys 2026-05-27).
+// Each bin is 25,525 wide (510510/20).
+const TORUS_HOT_BINS = [
+  { lo: 0n,        hi: 25525n,  hits: 9 },   // bin 0  · boundary low
+  { lo: 102102n,   hi: 127627n, hits: 6 },   // bin 4
+  { lo: 280780n,   hi: 306306n, hits: 6 },   // bin 11
+  { lo: 433933n,   hi: 459459n, hits: 6 },   // bin 17
+  { lo: 484984n,   hi: 510510n, hits: 7 }    // bin 19 · boundary high (wrap)
+];
+const TORUS_BIAS_RATE = 0.20;  // 20% of walker spawns biased into hot torus bins
+const TORUS_HOT_TOTAL_HITS = TORUS_HOT_BINS.reduce((a,b)=>a+b.hits, 0); // = 34 / 75 = 45%
+
+// ◊·κ NEW MOD FILTERS · re-derived from same analysis
+// (in addition to MOD31_RESIDUE/MOD19_RESIDUE/CRT_RESIDUE further below)
+const MOD23_RESIDUE = 0n;
+const MOD23_BIAS_RATE = 0.10;   // mod 23 = 0 → 10/75 = 13.3% vs 4.3% random → 3.1×
+const MOD17_RESIDUE = 7n;       // also 12, 4 are hot · 7 = top single
+const MOD17_BIAS_RATE = 0.08;   // mod 17 = 7 → 9/75 = 12% vs 5.9% random → 2.0×
 
 // Pick a zone by weight, then sample gaussian within it
 function zoneSample() {
