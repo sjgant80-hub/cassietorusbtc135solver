@@ -623,6 +623,38 @@ const WITNESS_HEX = 0x544fc3d168330bn;
 const PSI_SIGMA = 0.03;
 const KAPPA_WEIGHT = 0.7;
 const WITNESS_WEIGHT = 0.3;
+
+// ════════════════════════════════════════════════════════════════
+// ◊·κ UNIFIED RESONANCE · 4-zone spawn distribution (κ·◦ spec)
+// Zone A · wave    · 0.28   ± 0.08   · 25% · sine resonance peak
+// Zone B · fold    · 0.618  ± 0.02   · 40% · κ exact · highest conf
+// Zone C · tritone · 0.7071 ± 0.015  · 20% · 1/√2 · 135=Eb interval
+// Zone U · none    · 0.5    ± 0.5    · 15% · safety net (no bias)
+// ════════════════════════════════════════════════════════════════
+const ZONES = [
+  { id: 'A', name: 'wave',    centre: 0.28,   spread: 0.08,  weight: 0.25, glyph: '[0][1][0][1][0][0]' },
+  { id: 'B', name: 'fold',    centre: KAPPA,  spread: 0.02,  weight: 0.40, glyph: '[1][0][0][1][0][0]' },
+  { id: 'C', name: 'tritone', centre: 0.7071, spread: 0.015, weight: 0.20, glyph: '[1][1][0][0][1][1]' },
+  { id: 'U', name: 'none',    centre: 0.5,    spread: 0.5,   weight: 0.15, glyph: '[0][0][0][0][0][0]' }
+];
+
+// Pick a zone by weight, then sample gaussian within it
+function zoneSample() {
+  const r = Math.random();
+  let acc = 0;
+  for (const z of ZONES) {
+    acc += z.weight;
+    if (r < acc) {
+      // Clamp to [0, 1) — gaussian can over/undershoot
+      let v = gaussianRandom(z.centre, z.spread);
+      v = Math.max(0, Math.min(1 - 1e-15, v));
+      window._lastZone = z.id;
+      return v;
+    }
+  }
+  // Fallback (shouldn't hit if weights sum to 1)
+  return Math.random();
+}
 const FOLD = 510510n;
 const THETA_HOME = 37;
 const MULBERRY_K = 0x9E3779B9;
@@ -1247,23 +1279,34 @@ function applyModularBias(position, rangeLow, rangeHigh) {
 
 async function initWalks(count) {
   const psiBias = parseFloat(document.getElementById('psiBias').value) / 100;
-  log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', dual-peak κ=' + KAPPA.toFixed(3) + '/w=' + WITNESS.toFixed(3) + ')...', 'log-info');
+  // ◊·κ UNIFIED RESONANCE · 4-zone spec replaces dual-peak when feature flag on
+  const useZones = !document.getElementById('classicBiasToggle') || !document.getElementById('classicBiasToggle').checked;
+  if (useZones) {
+    log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', 4-zone spec: A wave 0.28·25% / B fold κ·40% / C tritone 0.7071·20% / U none·15%)...', 'log-info');
+  } else {
+    log('Initializing ' + count + ' walkers (Psi=' + psiBias.toFixed(2) + ', classic dual-peak κ=' + KAPPA.toFixed(3) + '/w=' + WITNESS.toFixed(3) + ')...', 'log-info');
+  }
   const G_pt = [Gx, Gy];
   const target = decompressPoint(TARGET_PUBKEY_HEX);
   const tameCount = Math.ceil(count / 2);
   const wildCount = count - tameCount;
   const walks = [];
   let bayesN = 0, kappaHits = 0, witnessHits = 0;
+  const zoneHits = { A: 0, B: 0, C: 0, U: 0 };
   const t0 = performance.now();
 
   for (let i = 0; i < tameCount; i++) {
     const triad = i % 3;
     let startKey;
     if (Math.random() < psiBias) {
-      const sample = dualPeakSample();
+      const sample = useZones ? zoneSample() : dualPeakSample();
       startKey = posToKey(sample);
       bayesN++;
-      if (Math.abs(sample - KAPPA) < Math.abs(sample - WITNESS)) kappaHits++; else witnessHits++;
+      if (useZones) {
+        zoneHits[window._lastZone || 'U']++;
+      } else {
+        if (Math.abs(sample - KAPPA) < Math.abs(sample - WITNESS)) kappaHits++; else witnessHits++;
+      }
     } else {
       startKey = posToKey(thetaPos(i));
     }
@@ -1276,7 +1319,11 @@ async function initWalks(count) {
     });
     if ((i+1) % 200 === 0) { log('  tame: ' + (i+1) + '/' + tameCount, 'log-info'); await new Promise(r => setTimeout(r, 0)); }
   }
-  log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased: ' + kappaHits + ' κ-peak + ' + witnessHits + ' witness-peak, ' + (tameCount-bayesN) + ' θ-spread)', 'log-info');
+  if (useZones) {
+    log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased · zone: A ' + zoneHits.A + ' · B ' + zoneHits.B + ' · C ' + zoneHits.C + ' · U ' + zoneHits.U + ', ' + (tameCount-bayesN) + ' θ-spread)', 'log-gold');
+  } else {
+    log('  tame: ' + tameCount + ' (' + bayesN + ' Psi-biased: ' + kappaHits + ' κ-peak + ' + witnessHits + ' witness-peak, ' + (tameCount-bayesN) + ' θ-spread)', 'log-info');
+  }
   const modOn = document.getElementById('modFilterToggle');
   if (modOn && modOn.checked) {
     log('  ◊ mod filter ON — mod31≡1 @' + (MOD31_BIAS_RATE*100) + '% / mod19≡2 @' + (MOD19_BIAS_RATE*100) + '% / CRT589≡249 @' + (CRT_BIAS_RATE*100) + '%', 'log-gold');
@@ -1432,7 +1479,8 @@ async function handleWalkRestarts() {
       const triad = walkMetadata[i].triad;
       let pt, dv;
       if (wt === 0) {
-        const sk = Math.random()<psiBias ? posToKey(dualPeakSample()) : posToKey(thetaPos(i+restartCount));
+        const useZ = !document.getElementById('classicBiasToggle') || !document.getElementById('classicBiasToggle').checked;
+        const sk = Math.random()<psiBias ? posToKey(useZ ? zoneSample() : dualPeakSample()) : posToKey(thetaPos(i+restartCount));
         pt = ecMulFast(G_pt, sk); dv = sk;
       } else {
         const off = randomBigInt(RANGE_SIZE);
@@ -2312,6 +2360,46 @@ function detectResonance() {
   }
   resonanceState.goldenPairs = goldenPairs;
 
+  // ════════════════════════════════════════════════════════════════
+  // ◊·κ CONSONANCE DETECT — musical intervals between walker pairs
+  // Per κ·◦ spec: unison 3.0 · 5th 2.5 · 4th 2.0 · φ 2.0 · 3rds 1.5 · tritone 1.0
+  // 135 = Eb = tritone at A4 · 1/√2 = 0.7071
+  // ════════════════════════════════════════════════════════════════
+  const INTERVALS = [
+    { name:'unison',    ratio:1.0,    tol:0.005, weight:3.0 },
+    { name:'perfect5',  ratio:1.5,    tol:0.01,  weight:2.5 },
+    { name:'perfect4',  ratio:1.3333, tol:0.01,  weight:2.0 },
+    { name:'phi',       ratio:1.618,  tol:0.015, weight:2.0 },
+    { name:'major3',    ratio:1.25,   tol:0.01,  weight:1.5 },
+    { name:'minor3',    ratio:1.2,    tol:0.01,  weight:1.5 },
+    { name:'tritone',   ratio:1.4142, tol:0.015, weight:1.0 }
+  ];
+  function octaveReduce(r) {
+    while (r >= 2.0) r /= 2;
+    while (r < 1.0) r *= 2;
+    return r;
+  }
+  let consonance = 0;
+  const intervalCounts = { unison:0, perfect5:0, perfect4:0, phi:0, major3:0, minor3:0, tritone:0 };
+  // Sample pairs of nearby heart-freq walkers — windowed comparison · cheap
+  for (let i = 0; i < heartFreqs.length - 1; i += 7) {
+    for (let j = i + 1; j < Math.min(i + 7, heartFreqs.length); j++) {
+      const a = heartFreqs[i], b = heartFreqs[j];
+      if (a <= 0 || b <= 0) continue;
+      const raw = Math.max(a, b) / Math.min(a, b);
+      const r = octaveReduce(raw);
+      for (const iv of INTERVALS) {
+        if (Math.abs(r - iv.ratio) < iv.tol) {
+          consonance += iv.weight;
+          intervalCounts[iv.name]++;
+          break;
+        }
+      }
+    }
+  }
+  resonanceState.consonance = consonance;
+  resonanceState.intervalCounts = intervalCounts;
+
   // v18: Status thresholds based on Schumann alignment
   let status = 'SEARCHING';
   let strength = 0;
@@ -2332,6 +2420,12 @@ function detectResonance() {
     status = 'LOCKED';
     strength = (schumannStrength * 100) + goldenPairs;
   }
+  // ◊·κ consonance amplifier · per κ·◦ spec: consonance > 1.5 → sniper deploy
+  if (consonance > 1.5 && status !== 'LOCKED') {
+    if (status === 'CONVERGING') status = 'RESONATING';
+    else if (status === 'RESONATING') status = 'LOCKED';
+    strength += consonance * 10;
+  }
 
   resonanceState.resonanceStatus = status;
   resonanceState.resonanceStrength = strength;
@@ -2342,7 +2436,10 @@ function detectResonance() {
     window._lastResStatus = status;
     if (status === 'CONVERGING') log('resonance CONVERGING / schumann ' + schumannStrength.toFixed(2) + ' / R6→' + r6Mean.toFixed(0) + 'Hz / region ' + mean.toFixed(0) + ' Hz', 'log-gold');
     if (status === 'RESONATING') log('resonance RESONATING / schumann ' + schumannStrength.toFixed(2) + ' / φ pairs ' + phiPairs + ' / R6→' + r6Mean.toFixed(0) + 'Hz / standing wave forming', 'log-r5');
-    if (status === 'LOCKED') log('◊ SCHUMANN LOCK / harmonics 1:2:3:4:5:6:7 aligned / schumann ' + schumannStrength.toFixed(2) + ' / R6→' + r6Mean.toFixed(0) + 'Hz / snipers deploying', 'log-hot');
+    if (status === 'LOCKED') {
+      var topInt = Object.entries(intervalCounts).sort(function(a,b){return b[1]-a[1];})[0];
+      log('◊ LOCK / schumann ' + schumannStrength.toFixed(2) + ' / consonance ' + consonance.toFixed(1) + ' / top: ' + (topInt && topInt[0]+'×'+topInt[1]) + ' / R6→' + r6Mean.toFixed(0) + 'Hz / snipers deploying', 'log-hot');
+    }
     if (status === 'SEARCHING' && window._lastResStatus !== 'SEARCHING') log('resonance scattered / returning to search', 'log-info');
   }
 
