@@ -3075,6 +3075,19 @@ function activateSovereignMesh() {
 window.fallConsensus = { activate: activateSovereignMesh, propose: fcAddProposal, vote: fcVote };
 
 // ═══════════════════════════════════════════════════
+// ◊·κ ORACLE LINK STALE-CHECK — fade indicator if no heartbeat in 5s
+setInterval(function(){
+  var ind = document.getElementById('oracleLinkIndicator');
+  if (!ind) return;
+  var age = Date.now() - (window._oracleLastSeen || 0);
+  if (age > 5000) {
+    ind.style.opacity = '0.35';
+    ind.innerHTML = '◊ Oracle silent · last seen ' + Math.round(age/1000) + 's ago';
+  } else {
+    ind.style.opacity = '1';
+  }
+}, 1000);
+
 // ◊·κ MATRYOSHKA SWITCHER — click 135/136/137 to change active puzzle
 // ═══════════════════════════════════════════════════
 function selectPuzzle(id) {
@@ -3614,6 +3627,24 @@ window.addEventListener('resize', resizeCanvases);
             if (typeof m.rates.crt589 === 'number') window.CRT_BIAS_RATE = m.rates.crt589;
             log('◊ Oracle filter update · mod31@' + ((window.MOD31_BIAS_RATE||0)*100).toFixed(0) + '% · mod19@' + ((window.MOD19_BIAS_RATE||0)*100).toFixed(0) + '% · CRT@' + ((window.CRT_BIAS_RATE||0)*100).toFixed(0) + '%', 'log-gold');
           }
+          // ◊·κ Oracle hello / heartbeat — reciprocal proof of life
+          if (m.type === 'oracle_hello' || m.type === 'oracle_heartbeat') {
+            window._oracleLastSeen = Date.now();
+            if (!window._oracleEverSeen) {
+              window._oracleEverSeen = true;
+              log('◊ Oracle linked · ' + m.from + ' · walker ' + (m.walker && m.walker.ready ? 'ready @ pos ' + m.walker.position : 'init'), 'log-r5');
+            }
+            // Update floating indicator
+            var ind = document.getElementById('oracleLinkIndicator');
+            if (!ind) {
+              ind = document.createElement('div');
+              ind.id = 'oracleLinkIndicator';
+              ind.style.cssText = 'position:fixed;top:18px;right:18px;z-index:99;background:rgba(20,20,17,0.92);border:1px solid var(--gold);border-radius:7px;padding:6px 12px;font-family:DM Mono,monospace;font-size:11px;color:var(--gold);box-shadow:0 0 12px rgba(184,151,74,0.3);';
+              document.body.appendChild(ind);
+            }
+            var w = m.walker || {};
+            ind.innerHTML = '◊ ORACLE LINKED · walker ' + (w.state || 'init') + ' · pos ' + (w.position || '—') + ' · conf ' + (w.confidence != null ? (w.confidence*100).toFixed(0) + '%' : '—');
+          }
           // ◊·κ Oracle Torus Meta-Walk — predictions from Oracle's prob-torus
           if (m.type === 'oracle_prediction' && Array.isArray(m.topCandidates)) {
             window._oraclePrediction = {
@@ -3644,9 +3675,44 @@ window.addEventListener('resize', resizeCanvases);
         log('◊·κ Oracle bridge: fall-signal channel open · Oracle Engine v2 may listen', 'log-r5');
       } catch(_){}
       // Send initial state snapshot to Oracle (lets it discover us)
-      setTimeout(function(){
-        if (window.oracleChannel) try { window.oracleChannel.postMessage({ type:'cassie_hello', tab: TAB_ID, zones: ZONES, hemisphere: TARGET_HEMISPHERE, ts: Date.now() }); } catch(_){}
-      }, 800);
+      // Multiple hello sends in case Oracle opens after CASSIE boots
+      function _sendHello(){
+        if (window.oracleChannel) try {
+          window.oracleChannel.postMessage({
+            type:'cassie_hello',
+            tab: TAB_ID,
+            zones: ZONES,
+            hemisphere: TARGET_HEMISPHERE,
+            puzzle: activePuzzleId,
+            kernel: activePuzzle().kernel_mode,
+            target: activePuzzle().target_addr,
+            ts: Date.now()
+          });
+        } catch(_){}
+      }
+      setTimeout(_sendHello, 300);
+      setTimeout(_sendHello, 1200);
+      setTimeout(_sendHello, 3000);
+
+      // ◊·κ HEARTBEAT — sends cassie_heartbeat every 2s regardless of solver state.
+      // Lets the Oracle confirm the link BEFORE the user clicks Start Solver, so
+      // the "CASSIE live" pulse turns on as soon as both tabs are open.
+      window._cassieHeartbeat = setInterval(function(){
+        if (!window.oracleChannel) return;
+        try {
+          window.oracleChannel.postMessage({
+            type: 'cassie_heartbeat',
+            tab: TAB_ID,
+            puzzle: activePuzzleId,
+            kernel: activePuzzle().kernel_mode,
+            running: !!window.running,
+            zones: ZONES.map(function(z){ return { id:z.id, centre:z.centre, weight:z.weight }; }),
+            dps_total: window.dpStore ? window.dpStore.size : 0,
+            mesh_peers: (window.MESH_PEER_LEDGER && window.MESH_PEER_LEDGER.peers) ? window.MESH_PEER_LEDGER.peers.size : 0,
+            ts: Date.now()
+          });
+        } catch(_){}
+      }, 2000);
       console.log('◊·κ=1 CASSIE TORUS v2 / WebGPU kangaroo + hash160 brute (136/137) + Oracle Torus Meta-Walk + open mesh + FallConsensus / seed v18');
       if (location.search.includes('autostart')) { log('Auto-starting...', 'log-info'); btnStart.click(); }
 
