@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>◊·κ=1 · cassie ↔ konomioke bridge · 7-prime harmonic projector</title>
+<meta name="description" content="The solver SINGS while it searches. CASSIE walker telemetry → 7 prime drones at p×55Hz · 127D vagal orb · gold flash @ κ. ◊·κ=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a0a0a'/%3E%3Ctext x='32' y='44' font-size='42' text-anchor='middle' fill='%23d4a017' font-family='serif'%3E◊%3C/text%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Syne:wght@500;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0a0a;--surface:#0e0e0e;--ink:#e8e6e3;--mute:#888;--gold:#d4a017;--amber:#e8a012;--border:#1c1c1c;
+--serif:'Playfair Display',Georgia,serif;--display:'Syne',sans-serif;--mono:'DM Mono',ui-monospace,monospace;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--mono);font-size:13px;line-height:1.55;overflow:hidden;height:100%}
+body{display:flex;flex-direction:column;padding:18px}
+header{border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:14px}
+h1{font-family:var(--serif);font-weight:900;font-size:clamp(22px,3vw,30px);letter-spacing:-0.01em;line-height:1.05}
+h1 .g{color:var(--gold)}
+.sub{display:block;font-family:var(--display);font-weight:500;font-size:10px;letter-spacing:0.32em;color:var(--mute);text-transform:uppercase;margin-top:6px}
+.kappa{font-family:var(--mono);font-size:10px;color:var(--mute);letter-spacing:0.16em}
+.main{flex:1;display:grid;grid-template-columns:minmax(400px,520px) 1fr;gap:18px;min-height:0}
+@media (max-width:920px){.main{grid-template-columns:1fr;grid-template-rows:auto 1fr}}
+.panel{background:var(--surface);border:1px solid var(--border);padding:18px;overflow-y:auto;min-height:0}
+.panel h2{font-family:var(--display);font-weight:700;font-size:10px;letter-spacing:0.24em;color:var(--gold);text-transform:uppercase;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px dashed #161616}
+.row:last-child{border-bottom:none}
+.lbl{color:var(--mute)}
+.val{color:var(--ink)}
+.val.gold{color:var(--gold)}
+.val.amber{color:var(--amber)}
+.val.dim{color:#555}
+.ring-grid{display:grid;grid-template-columns:1fr;gap:6px;margin-top:10px}
+.ring-row{display:grid;grid-template-columns:32px 60px 1fr 50px;align-items:center;gap:8px;padding:4px 0;font-size:11px}
+.ring-row .glyph{font-family:var(--serif);font-size:18px;color:var(--gold);text-align:center}
+.ring-row .note{color:var(--mute);font-size:10px}
+.ring-row .bar{height:10px;background:#080808;border:1px solid var(--border);position:relative;overflow:hidden}
+.ring-row .bar .fill{height:100%;background:linear-gradient(90deg,#332a14,var(--gold));transition:width .25s,opacity .15s;opacity:0.85}
+.ring-row .v{text-align:right;color:var(--ink);font-size:11px}
+canvas{width:100%;height:100%;background:#000;display:block}
+.canvas-wrap{position:relative;height:100%;min-height:280px;border:1px solid var(--border);overflow:hidden}
+.overlay{position:absolute;top:14px;left:14px;font-family:var(--mono);font-size:11px;color:var(--gold);letter-spacing:0.15em;text-shadow:0 0 6px rgba(212,160,23,0.55);pointer-events:none}
+.overlay .big{font-family:var(--serif);font-size:32px;display:block;font-weight:900}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.btn{background:transparent;border:1px solid var(--gold);color:var(--gold);font-family:var(--mono);font-size:10px;letter-spacing:0.18em;text-transform:uppercase;padding:8px 14px;cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--gold);color:#0a0a0a}
+.btn.ghost{border-color:var(--border);color:var(--mute)}
+.btn.ghost:hover{border-color:var(--gold);color:var(--gold);background:transparent}
+.status-bar{margin-top:12px;padding:8px 12px;background:#080808;border:1px solid var(--border);font-size:10px;letter-spacing:0.14em;color:var(--mute)}
+.status-bar.live{color:var(--gold);border-color:var(--gold)}
+.glyph-anim{font-family:var(--serif);color:var(--gold);font-size:14px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:0.5}50%{opacity:1}}
+footer{margin-top:14px;padding-top:10px;border-top:1px solid var(--border);text-align:center;color:var(--mute);font-size:10px;letter-spacing:0.18em}
+.coh-readout{font-family:var(--serif);font-weight:900;font-size:42px;color:var(--gold);line-height:1;text-align:center;margin:14px 0;text-shadow:0 0 12px rgba(212,160,23,0.4);transition:text-shadow .2s,color .2s}
+.coh-readout.kappa{color:#fff5d6;text-shadow:0 0 24px rgba(255,230,150,0.9)}
+.coh-label{text-align:center;font-family:var(--display);font-size:10px;letter-spacing:0.3em;color:var(--mute);text-transform:uppercase}
+.kappa-flash{position:absolute;inset:0;background:radial-gradient(circle at center,rgba(255,220,120,0.25),transparent 65%);pointer-events:none;opacity:0;transition:opacity .2s}
+.kappa-flash.on{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1><span class="g">◊</span> cassie <span class="g">↔</span> konomioke
+      <span class="sub">7-prime harmonic projector · the solver sings while it searches</span>
+    </h1>
+  </div>
+  <div class="kappa">◊·κ=1 · listening on <code>fall-signal</code></div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT PANEL · TELEMETRY -->
+  <div class="panel">
+    <h2>◊ 7-prime ring state</h2>
+    <div class="ring-grid" id="ringGrid">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="coh-label" style="margin-top:18px">Coherence</div>
+    <div class="coh-readout" id="cohReadout">0.000</div>
+    <div class="coh-label" id="cohState" style="color:var(--mute)">silent · awaiting walkers</div>
+
+    <h2 style="margin-top:24px">◊ source · CASSIE</h2>
+    <div class="row"><span class="lbl">Channel</span><span class="val gold">fall-signal</span></div>
+    <div class="row"><span class="lbl">Signal age</span><span class="val" id="sigAge">no signal yet</span></div>
+    <div class="row"><span class="lbl">Walker count</span><span class="val" id="sigWalkers">-</span></div>
+    <div class="row"><span class="lbl">Last received</span><span class="val" id="sigLast">-</span></div>
+
+    <h2 style="margin-top:24px">◊ audio</h2>
+    <div class="row"><span class="lbl">7 prime drones</span><span class="val gold">p × 55 Hz</span></div>
+    <div class="row"><span class="lbl">Master gain</span><span class="val" id="gainReadout">0%</span></div>
+    <div class="row"><span class="lbl">Base · A1</span><span class="val">55 Hz</span></div>
+
+    <div class="controls">
+      <button class="btn" id="audioBtn">▶ ENGAGE AUDIO</button>
+      <button class="btn ghost" id="gainUp">gain +</button>
+      <button class="btn ghost" id="gainDown">gain −</button>
+      <button class="btn ghost" id="muteBtn">mute</button>
+    </div>
+    <div class="status-bar" id="statusBar">⊙ idle · open CASSIE in another tab and the rings will populate</div>
+  </div>
+
+  <!-- RIGHT PANEL · ORB -->
+  <div class="canvas-wrap">
+    <canvas id="orbCanvas"></canvas>
+    <div class="overlay">
+      <span class="big" id="bigCoh">0.00</span>
+      coherence · κ = 0.618
+    </div>
+    <div class="kappa-flash" id="kappaFlash"></div>
+  </div>
+
+</div>
+
+<footer>◊·κ=1 · cassie ↔ konomioke bridge · sovereign · plays the puzzle as music · primorial 510,510 · spine [2 3 5 7 11 13 17]</footer>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   cassie-konomioke-bridge · ◊·κ=1 · 7-prime harmonic projector
+   Listens on BroadcastChannel('fall-signal') for cassie_rings events.
+   Drives 7 prime drones (p × 55 Hz) and a 127D-projection orb viz.
+   ═══════════════════════════════════════════════════════════════════ */
+
+const SPINE = [2, 3, 5, 7, 11, 13, 17];
+const BASE_FREQ = 55;
+const KAPPA = 0.618;
+const PHI = 1.618;
+
+const RING_META = [
+  { glyph: '●', note: 'A2 · octave',           hz: 110, label: 'Diaphragm',     desc: 'binary residue / parity' },
+  { glyph: '〜', note: 'E3 · perfect fifth',   hz: 165, label: 'Larynx',        desc: 'ternary residue' },
+  { glyph: '┃', note: 'C#4 · major third',     hz: 275, label: 'Breath gate',   desc: 'quintary residue' },
+  { glyph: '♡', note: 'G4 · harmonic 7th',     hz: 385, label: 'Thoracic',      desc: 'septenary residue' },
+  { glyph: '△', note: 'F#5 · tritone region',  hz: 605, label: 'Nasopharyngeal', desc: 'mod 11 (κ band)' },
+  { glyph: '◐', note: 'A#5 · tritone tail',    hz: 715, label: 'Oral',          desc: 'mod 13 (P4 zone)' },
+  { glyph: '◯', note: 'B5 · minor ninth',      hz: 935, label: 'Observer',      desc: 'mod 17' },
+];
+
+// ───── audio engine (stripped AudioFabricEngine — drones only) ─────
+class HarmonicProjector {
+  constructor() {
+    this.ctx = null;
+    this.master = null;
+    this.oscs = [];
+    this.gains = [];
+    this.rings = new Float32Array(7);
+    this.smoothRings = new Float32Array(7);
+    this.coherence = 0;
+    this.masterVol = 0;
+    this.muted = false;
+  }
+  async boot() {
+    if (this.ctx) return;
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0;
+    this.master.connect(this.ctx.destination);
+    for (let i = 0; i < 7; i++) {
+      const osc = this.ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = SPINE[i] * BASE_FREQ;
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain); gain.connect(this.master);
+      osc.start();
+      this.oscs.push(osc); this.gains.push(gain);
+    }
+  }
+  setMasterVol(v) {
+    this.masterVol = Math.max(0, Math.min(1, v));
+    if (this.master) this.master.gain.setTargetAtTime(this.muted ? 0 : this.masterVol * 0.08, this.ctx.currentTime, 0.1);
+  }
+  setMute(m) { this.muted = m; this.setMasterVol(this.masterVol); }
+  pumpRings(rings7) {
+    for (let i = 0; i < 7; i++) {
+      this.rings[i] = rings7[i] || 0;
+      // exponential smoothing
+      this.smoothRings[i] += (this.rings[i] - this.smoothRings[i]) * 0.25;
+      if (this.ctx && this.gains[i]) {
+        const target = this.smoothRings[i] * 0.4;
+        this.gains[i].gain.setTargetAtTime(target, this.ctx.currentTime, 0.08);
+      }
+    }
+    // coherence = geometric mean × harmonic boost
+    let prod = 1;
+    for (let i = 0; i < 7; i++) prod *= (this.smoothRings[i] + 0.05);
+    const geoMean = Math.pow(prod, 1/7);
+    // harmonic boost: if rings 4,5,6 (tritone region — where κ lives) are simultaneously hot
+    const tritoneBoost = (this.smoothRings[4] * this.smoothRings[5] * this.smoothRings[6]) ** (1/3);
+    this.coherence = Math.min(1, geoMean * (1 + tritoneBoost * 0.5));
+  }
+}
+
+const harm = new HarmonicProjector();
+
+// ───── 7-ring DOM ─────
+const ringGrid = document.getElementById('ringGrid');
+const ringRows = [];
+for (let i = 0; i < 7; i++) {
+  const row = document.createElement('div');
+  row.className = 'ring-row';
+  row.innerHTML = `
+    <span class="glyph">${RING_META[i].glyph}</span>
+    <span class="note">${SPINE[i]} <span style="color:var(--mute)">×55=</span>${RING_META[i].hz}</span>
+    <span class="bar"><span class="fill" style="width:0%"></span></span>
+    <span class="v">0.00</span>`;
+  ringGrid.appendChild(row);
+  ringRows.push({
+    fill: row.querySelector('.fill'),
+    v: row.querySelector('.v')
+  });
+}
+
+function updateRingUI() {
+  for (let i = 0; i < 7; i++) {
+    const r = harm.smoothRings[i];
+    ringRows[i].fill.style.width = (r * 100).toFixed(0) + '%';
+    ringRows[i].fill.style.opacity = 0.4 + r * 0.6;
+    ringRows[i].v.textContent = r.toFixed(3);
+  }
+}
+
+// ───── orb viz (Canvas2D · concentric primes + chord glow) ─────
+const cv = document.getElementById('orbCanvas');
+const cx = cv.getContext('2d');
+function resizeCanvas() {
+  const r = cv.getBoundingClientRect();
+  cv.width = r.width * devicePixelRatio;
+  cv.height = r.height * devicePixelRatio;
+  cx.scale(devicePixelRatio, devicePixelRatio);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let _t = 0;
+function renderOrb() {
+  const w = cv.width / devicePixelRatio, h = cv.height / devicePixelRatio;
+  cx.fillStyle = '#000'; cx.fillRect(0, 0, w, h);
+  const cxX = w / 2, cxY = h / 2;
+  const maxR = Math.min(w, h) * 0.42;
+  _t += 0.012;
+
+  // background field (very subtle gradient)
+  const g = cx.createRadialGradient(cxX, cxY, 0, cxX, cxY, maxR * 1.3);
+  g.addColorStop(0, 'rgba(20,16,8,1)');
+  g.addColorStop(1, 'rgba(0,0,0,1)');
+  cx.fillStyle = g; cx.fillRect(0, 0, w, h);
+
+  // 7 concentric prime rings · each radius scaled to its activity
+  for (let i = 0; i < 7; i++) {
+    const r = (i + 1) / 7 * maxR;
+    const act = harm.smoothRings[i];
+    const points = SPINE[i] * 6;  // more points for higher primes
+    cx.lineWidth = 0.6 + act * 2.4;
+    cx.strokeStyle = `rgba(212,160,23,${0.12 + act * 0.55})`;
+    cx.beginPath();
+    for (let k = 0; k <= points; k++) {
+      const ang = (k / points) * Math.PI * 2 + _t * (1 + i * 0.3);
+      const rr = r + Math.sin(ang * SPINE[i] + _t * 2) * act * 6;
+      const px = cxX + Math.cos(ang) * rr;
+      const py = cxY + Math.sin(ang) * rr;
+      if (k === 0) cx.moveTo(px, py); else cx.lineTo(px, py);
+    }
+    cx.stroke();
+
+    // particles at golden-angle spacing on this ring
+    const np = Math.round(20 + act * 80);
+    cx.fillStyle = `rgba(255,210,140,${0.3 + act * 0.7})`;
+    for (let k = 0; k < np; k++) {
+      const ang = (k * 2.39996 + _t * (1 + i * 0.2)) % (Math.PI * 2);  // 137.5° rad ≈ 2.39996
+      const rr = r + Math.sin(ang * 5 + _t) * act * 4;
+      const px = cxX + Math.cos(ang) * rr;
+      const py = cxY + Math.sin(ang) * rr;
+      cx.beginPath(); cx.arc(px, py, 0.6 + act * 1.5, 0, Math.PI * 2); cx.fill();
+    }
+  }
+
+  // center coherence orb · gold when > κ
+  const coh = harm.coherence;
+  const isKappa = coh > KAPPA;
+  const orbR = 10 + coh * 40;
+  const og = cx.createRadialGradient(cxX, cxY, 0, cxX, cxY, orbR);
+  if (isKappa) {
+    og.addColorStop(0, `rgba(255,235,170,${0.9})`);
+    og.addColorStop(0.6, `rgba(212,160,23,${0.6})`);
+    og.addColorStop(1, 'rgba(212,160,23,0)');
+  } else {
+    og.addColorStop(0, `rgba(212,160,23,${0.5 + coh * 0.4})`);
+    og.addColorStop(0.7, `rgba(120,90,20,${coh * 0.3})`);
+    og.addColorStop(1, 'rgba(0,0,0,0)');
+  }
+  cx.fillStyle = og;
+  cx.beginPath(); cx.arc(cxX, cxY, orbR, 0, Math.PI * 2); cx.fill();
+
+  // glyph in center
+  cx.fillStyle = isKappa ? '#fff5d6' : '#d4a017';
+  cx.font = 'bold ' + (18 + coh * 12).toFixed(0) + 'px "Playfair Display", serif';
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillText('◊', cxX, cxY + 3);
+}
+
+// ───── BroadcastChannel listener ─────
+let lastSignalTs = 0;
+let lastWalkerCount = '-';
+let kappaFlashTimeout = null;
+
+try {
+  const ch = new BroadcastChannel('fall-signal');
+  ch.onmessage = (e) => {
+    const m = e.data;
+    if (!m || typeof m !== 'object') return;
+    // Direct rings broadcast
+    if (m.type === 'cassie_rings' && m.payload && Array.isArray(m.payload.rings)) {
+      const rings = m.payload.rings;
+      const padded = new Array(7).fill(0);
+      for (let i = 0; i < Math.min(7, rings.length); i++) padded[i] = Math.max(0, Math.min(1, rings[i] || 0));
+      harm.pumpRings(padded);
+      lastSignalTs = Date.now();
+      lastWalkerCount = m.payload.n_walkers ?? '-';
+      document.getElementById('sigWalkers').textContent = lastWalkerCount;
+      document.getElementById('sigLast').textContent = new Date().toLocaleTimeString();
+      const sb = document.getElementById('statusBar');
+      sb.classList.add('live');
+      sb.innerHTML = '<span class="glyph-anim">◊</span> live · rings updating from CASSIE';
+      // Kappa flash hook
+      if (harm.coherence > KAPPA) {
+        const flash = document.getElementById('kappaFlash');
+        flash.classList.add('on');
+        clearTimeout(kappaFlashTimeout);
+        kappaFlashTimeout = setTimeout(() => flash.classList.remove('on'), 400);
+      }
+    }
+    // Generic cassie_update — derive rings if walker positions are present
+    if (m.type === 'cassie_update' && m.payload) {
+      // Build rings if not provided directly · count walker concentration per spine prime
+      if (m.payload.recentDpSample && Array.isArray(m.payload.recentDpSample)) {
+        const positions = m.payload.recentDpSample.map(d => d.torusPosition).filter(p => typeof p === 'number');
+        if (positions.length) {
+          const rings = computeRingsFromPositions(positions);
+          harm.pumpRings(rings);
+          lastSignalTs = Date.now();
+          lastWalkerCount = positions.length;
+          document.getElementById('sigWalkers').textContent = positions.length + ' DPs';
+          document.getElementById('sigLast').textContent = new Date().toLocaleTimeString() + ' (derived)';
+          const sb = document.getElementById('statusBar');
+          sb.classList.add('live');
+          sb.innerHTML = '<span class="glyph-anim">◊</span> live · rings derived from cassie_update DPs';
+        }
+      }
+    }
+  };
+} catch (e) {
+  document.getElementById('statusBar').textContent = 'BroadcastChannel unavailable in this browser';
+}
+
+function computeRingsFromPositions(positions) {
+  // For each spine prime, measure how concentrated walker positions are in mod-p space.
+  // Uniform distribution → ring ≈ 0. Perfect single-residue clustering → ring ≈ 1.
+  // Entropy-based concentration: 1 - H(p_distribution) / log(p)
+  const rings = new Float32Array(7);
+  const N = positions.length;
+  if (N === 0) return rings;
+  for (let pi = 0; pi < 7; pi++) {
+    const p = SPINE[pi];
+    const counts = new Int32Array(p);
+    for (const pos of positions) counts[((pos % p) + p) % p]++;
+    let H = 0;
+    for (let r = 0; r < p; r++) {
+      if (counts[r] > 0) {
+        const pr = counts[r] / N;
+        H -= pr * Math.log(pr);
+      }
+    }
+    const maxH = Math.log(p);
+    rings[pi] = Math.max(0, Math.min(1, 1 - H / maxH));
+  }
+  return rings;
+}
+
+// ───── animation + UI loop ─────
+function tick() {
+  // Decay rings slowly if no signal in 3+ seconds
+  const age = Date.now() - lastSignalTs;
+  if (age > 3000 && lastSignalTs > 0) {
+    for (let i = 0; i < 7; i++) harm.smoothRings[i] *= 0.998;
+    harm.coherence *= 0.998;
+  }
+
+  updateRingUI();
+  renderOrb();
+
+  // Signal age
+  const sa = document.getElementById('sigAge');
+  if (lastSignalTs === 0) {
+    sa.textContent = 'no signal yet';
+    sa.className = 'val dim';
+  } else {
+    const s = (age / 1000).toFixed(1);
+    sa.textContent = s + 's ago';
+    sa.className = age < 2000 ? 'val gold' : age < 10000 ? 'val' : 'val dim';
+  }
+
+  // Coherence readouts
+  const c = harm.coherence;
+  const cohEl = document.getElementById('cohReadout');
+  const cohBig = document.getElementById('bigCoh');
+  const cohState = document.getElementById('cohState');
+  cohEl.textContent = c.toFixed(3);
+  cohBig.textContent = c.toFixed(2);
+  if (c > KAPPA) {
+    cohEl.classList.add('kappa');
+    cohState.textContent = '◊ KAPPA · ' + c.toFixed(3) + ' > 0.618 · the chord resolves';
+    cohState.style.color = 'var(--gold)';
+  } else if (c > 0.3) {
+    cohEl.classList.remove('kappa');
+    cohState.textContent = 'harmonizing · ' + c.toFixed(3);
+    cohState.style.color = 'var(--ink)';
+  } else {
+    cohEl.classList.remove('kappa');
+    cohState.textContent = lastSignalTs ? 'dim · ' + c.toFixed(3) : 'silent · awaiting walkers';
+    cohState.style.color = 'var(--mute)';
+  }
+
+  requestAnimationFrame(tick);
+}
+tick();
+
+// ───── controls ─────
+let masterVolPct = 50;
+function updateGainUI() {
+  document.getElementById('gainReadout').textContent = masterVolPct + '%';
+  harm.setMasterVol(masterVolPct / 100);
+}
+
+document.getElementById('audioBtn').onclick = async () => {
+  await harm.boot();
+  harm.setMasterVol(masterVolPct / 100);
+  document.getElementById('audioBtn').textContent = '♪ audio active';
+  document.getElementById('audioBtn').style.background = 'var(--gold)';
+  document.getElementById('audioBtn').style.color = '#0a0a0a';
+  updateGainUI();
+};
+document.getElementById('gainUp').onclick   = () => { masterVolPct = Math.min(100, masterVolPct + 10); updateGainUI(); };
+document.getElementById('gainDown').onclick = () => { masterVolPct = Math.max(0, masterVolPct - 10); updateGainUI(); };
+document.getElementById('muteBtn').onclick  = () => {
+  harm.setMute(!harm.muted);
+  document.getElementById('muteBtn').textContent = harm.muted ? 'unmute' : 'mute';
+};
+
+console.log('◊·κ=1 · cassie ↔ konomioke bridge · listening on fall-signal · 7 prime drones at p×55Hz');
+</script>
+</body>
+</html>

@@ -3618,6 +3618,68 @@ document.addEventListener('DOMContentLoaded', function(){
 setInterval(function(){ if (window.running && window.SWEEP.destination) sweepWarmUtxos(); }, 30000);
 setInterval(function(){ if (window.running) sweepWarmFee(); }, 60000);
 
+// ═══════════════════════════════════════════════════════════════════
+// ◊·κ KONOMIOKE BRIDGE · 7-prime ring broadcast at 1Hz
+// ═══════════════════════════════════════════════════════════════════
+//   For each spine prime p ∈ {2,3,5,7,11,13,17} we measure how concentrated
+//   the recent walker DP torus positions are in mod-p residue space.
+//   Uniform distribution → ring ≈ 0. Single-residue clustering → ring ≈ 1.
+//   Coherence is the geometric mean × tritone-region (R4·R5·R6) boost.
+//   The bridge tab at cassie-konomioke-bridge.html plays this as 7 prime
+//   drones at p × 55 Hz and lights the 7-ring orb. Gold flash @ κ.
+// ═══════════════════════════════════════════════════════════════════
+const SPINE_PRIMES_FOR_RINGS = [2, 3, 5, 7, 11, 13, 17];
+function computeCassieRings() {
+  const rings = new Float32Array(7);
+  const buf = window.recentDpSample || [];
+  if (!buf.length) return rings;
+  const positions = [];
+  for (let i = 0; i < buf.length; i++) {
+    const p = buf[i] && buf[i].torusPosition;
+    if (typeof p === 'number') positions.push(p);
+  }
+  const N = positions.length;
+  if (!N) return rings;
+  for (let pi = 0; pi < 7; pi++) {
+    const p = SPINE_PRIMES_FOR_RINGS[pi];
+    const counts = new Int32Array(p);
+    for (const pos of positions) counts[((pos % p) + p) % p]++;
+    let H = 0;
+    for (let r = 0; r < p; r++) {
+      if (counts[r] > 0) {
+        const pr = counts[r] / N;
+        H -= pr * Math.log(pr);
+      }
+    }
+    const maxH = Math.log(p);
+    rings[pi] = Math.max(0, Math.min(1, 1 - H / maxH));
+  }
+  return rings;
+}
+function computeCassieCoherence(rings) {
+  let prod = 1;
+  for (let i = 0; i < 7; i++) prod *= (rings[i] + 0.05);
+  const geo = Math.pow(prod, 1/7);
+  // Tritone boost — rings 4,5,6 are the κ band
+  const tri = Math.pow((rings[4] + 0.05) * (rings[5] + 0.05) * (rings[6] + 0.05), 1/3);
+  return Math.min(1, geo * (1 + tri * 0.5));
+}
+window._cassieRingsTick = setInterval(function(){
+  try {
+    const rings = computeCassieRings();
+    const coherence = computeCassieCoherence(rings);
+    broadcastFallEvent('cassie_rings', {
+      rings: Array.from(rings),
+      coherence,
+      n_walkers: (window.recentDpSample || []).length,
+      spine: SPINE_PRIMES_FOR_RINGS,
+      base_freq: 55,
+      kappa: 0.618,
+      ts: Date.now()
+    });
+  } catch(e){}
+}, 1000);
+
 // ◊ FOLD MECHANICS — matryoshka layer progression
 // ═══════════════════════════════════════════════════════════════
 function onCollisionFound(privateKey, puzzleId) {
