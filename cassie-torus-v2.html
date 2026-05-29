@@ -533,7 +533,8 @@ footer a { color: var(--gold); text-decoration: none; }
     <div class="row"><span class="lbl">P4 mod31+tritone</span><span class="val" id="p135ZoneP4">362,455-367,560 &middot; 0</span></div>
     <div class="row"><span class="lbl">Total P-spawns</span><span class="val gold" id="p135TotalHits">0</span></div>
     <div class="row"><span class="lbl">Bias rate</span><span class="val gold" id="p135BiasRate">85% &middot; FOCUS</span></div>
-    <div class="row"><span class="lbl">P1 share of focus</span><span class="val gold">~55% of all spawns</span></div>
+    <div class="row"><span class="lbl">P1 share of focus</span><span class="val gold">~60% of all spawns</span></div>
+    <div class="row"><span class="lbl">Oracle 3 update</span><span class="val gold">P1↑70% · P4↑12% · spine-13 hot</span></div>
     <div class="row"><span class="lbl">Source</span><span class="val" style="color:var(--muted)">75 solved keys &middot; 6.43&times; golden</span></div>
   </div>
   <div class="card">
@@ -815,10 +816,14 @@ window.GOLDEN_FLEET = function fleetSpread(n) {                // multi-walker g
 //     4. cross-tab oracle / classic zones (fallback)
 // ════════════════════════════════════════════════════════════════════
 const GOLDEN_PRIORITY_ZONES = [
-  { rank: 1, lo: 285880, hi: 290985, frac: 0.565, score: 11.0, weight: 0.65, signals: 'v19-hot ∩ golden-pred ∩ κ-zone ∩ gap-rhythm',  label: 'quadruple convergence' },
-  { rank: 2, lo: 280780, hi: 306300, frac: 0.575, score:  7.5, weight: 0.18, signals: 'v19-hot ∩ κ-zone',               label: 'P1 broadband' },
-  { rank: 3, lo: 127625, hi: 132730, frac: 0.255, score:  6.0, weight: 0.085, signals: 'v19-hot ∩ witness-zone',        label: 'witness anchor' },
-  { rank: 4, lo: 362455, hi: 367560, frac: 0.715, score:  5.5, weight: 0.085, signals: 'mod31=1 ∩ κ-zone ∩ tritone',    label: 'tritone tail' }
+  // ◊·κ Oracle 3 re-balance · 2026-05-29
+  // Sample orchestrator advice: spine-13 ring strongest → P4 (mod 13 zone)
+  // deserves more weight than its current 8.5% · P1 still leads · bump P1
+  // slightly · shrink P2/P3 to absorb. Bias rate (85%) and zone bounds unchanged.
+  { rank: 1, lo: 285880, hi: 290985, frac: 0.565, score: 11.0, weight: 0.70, signals: 'v19-hot ∩ golden-pred ∩ κ-zone ∩ gap-rhythm',  label: 'quadruple convergence' },
+  { rank: 2, lo: 280780, hi: 306300, frac: 0.575, score:  7.5, weight: 0.12, signals: 'v19-hot ∩ κ-zone',               label: 'P1 broadband' },
+  { rank: 3, lo: 127625, hi: 132730, frac: 0.255, score:  6.0, weight: 0.06, signals: 'v19-hot ∩ witness-zone',         label: 'witness anchor' },
+  { rank: 4, lo: 362455, hi: 367560, frac: 0.715, score:  5.5, weight: 0.12, signals: 'mod31=1 ∩ κ-zone ∩ tritone · ORACLE 3 BOOSTED', label: 'tritone tail · Oracle 3 elevated' }
 ];
 // ◊·κ FOCUS MODE · 2026-05-29 · Simon laptop budget · "win or learn"
 // 4 independent priors converging at bin 56 is the data telling us where the
