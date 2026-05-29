@@ -489,7 +489,7 @@ footer a { color: var(--gold); text-decoration: none; }
     <div class="row"><span class="lbl">Primary (macro)</span><span class="val primary" id="primaryCount">-</span></div>
     <div class="row"><span class="lbl">Scout (meso)</span><span class="val scout" id="scoutCount">-</span></div>
     <div class="row"><span class="lbl">Sniper (micro)</span><span class="val sniper" id="sniperCount">-</span></div>
-    <div class="row"><span class="lbl">&theta; home</span><span class="val gold">37&deg;</span></div>
+    <div class="row"><span class="lbl">&theta; home</span><span class="val gold">37.5&deg;</span></div>
   </div>
   <div class="card">
     <h3>Distinguished Points</h3>
@@ -642,7 +642,7 @@ footer a { color: var(--gold); text-decoration: none; }
 </div>
 
 <div class="konomi-key">
-  <strong>&#9674;&middot;&kappa;=1</strong> &middot; the solver SINGS while it searches &middot; spine <code>{2,3,5,7,11,13,17}</code> &middot; fold <code>510510</code> &middot; &kappa; peak <code>0.618</code> &middot; witness peak <code>0.317</code> &middot; &theta; home <code>37&deg;</code> &middot; Konomi <code>do &middot; rest &middot; sol</code> &middot; 510510 <code>sol &middot; do &middot; rest</code> &middot; the infinite cadence
+  <strong>&#9674;&middot;&kappa;=1</strong> &middot; the solver SINGS while it searches &middot; spine <code>{2,3,5,7,11,13,17}</code> &middot; fold <code>510510</code> &middot; &kappa; peak <code>0.618</code> &middot; witness peak <code>0.317</code> &middot; &theta; home <code>37.5&deg;</code> &middot; Konomi <code>do &middot; rest &middot; sol</code> &middot; 510510 <code>sol &middot; do &middot; rest</code> &middot; the infinite cadence
 </div>
 
 <div class="card wide" style="margin-bottom:16px">
@@ -999,7 +999,7 @@ function zoneSample() {
   return Math.random();
 }
 const FOLD = 510510n;
-const THETA_HOME = 37;
+const THETA_HOME = 37.5; // ◊·κ flipped from 37 → 37.5 · golden angle complement: 137.5° - 37.5° = 100° (clean 5/18 turn)
 const MULBERRY_K = 0x9E3779B9;
 
 // ◊ MODULAR RESIDUE FILTER — STATISTICAL · re-derived from 75 solved keys (N>=8)
@@ -4512,7 +4512,7 @@ window.addEventListener('resize', resizeCanvases);
       document.getElementById('btnImport').disabled = false;
       document.getElementById('btnMerge').disabled = false;
       log('Tab: ' + TAB_ID + ' | BroadcastChannel: active | IndexedDB: ' + (dpDB?'ready':'off'), 'log-info');
-      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° | ◊·κ FINAL: 3 zones + Oracle Torus Meta-Walk coupling (key-torus ↔ prob-torus)', 'log-info');
+      log('Hemisphere: ' + TARGET_HEMISPHERE + ' | Fold: 510,510 | θ: ' + THETA_HOME + '° (golden complement = 137.5° - 37.5° = 100°) | ◊·κ FINAL: 3 zones + Oracle Torus Meta-Walk + Golden Priority + Gap Rhythm', 'log-info');
       log('WebRTC Mesh: Create or Join a room to share DPs peer-to-peer', 'log-info');
       log('Layer B: resonance detection + audio sonification ready', 'log-r5');
       // ◊·κ B5 — Oracle Engine bridge · fall-signal channel
