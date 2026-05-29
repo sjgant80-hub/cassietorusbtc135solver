@@ -532,7 +532,8 @@ footer a { color: var(--gold); text-decoration: none; }
     <div class="row"><span class="lbl">P3 witness</span><span class="val" id="p135ZoneP3">127,625-132,730 &middot; 0</span></div>
     <div class="row"><span class="lbl">P4 mod31+tritone</span><span class="val" id="p135ZoneP4">362,455-367,560 &middot; 0</span></div>
     <div class="row"><span class="lbl">Total P-spawns</span><span class="val gold" id="p135TotalHits">0</span></div>
-    <div class="row"><span class="lbl">Bias rate</span><span class="val" id="p135BiasRate">30%</span></div>
+    <div class="row"><span class="lbl">Bias rate</span><span class="val gold" id="p135BiasRate">85% &middot; FOCUS</span></div>
+    <div class="row"><span class="lbl">P1 share of focus</span><span class="val gold">~55% of all spawns</span></div>
     <div class="row"><span class="lbl">Source</span><span class="val" style="color:var(--muted)">75 solved keys &middot; 6.43&times; golden</span></div>
   </div>
   <div class="card">
@@ -749,7 +750,7 @@ const GOLDEN_TORUS_SIZE = 510510;
 const GOLDEN_STEP       = 194993;
 const GOLDEN_PHI_SQ     = 2.6180339887;
 const GOLDEN_DEG        = (360 * GOLDEN_STEP) / GOLDEN_TORUS_SIZE; // ≈ 137.5046°
-const GOLDEN_BIAS_RATE  = 0.25;  // 25% of walker spawns use golden-angle spacing
+const GOLDEN_BIAS_RATE  = 0.05;  // FOCUS MODE · was 0.25 · token uniform fill after priority bias takes 85%
 
 (function verifyGolden() {
   function gcd(a, b) { while (b) { [a, b] = [b, a % b]; } return a; }
@@ -814,12 +815,31 @@ window.GOLDEN_FLEET = function fleetSpread(n) {                // multi-walker g
 //     4. cross-tab oracle / classic zones (fallback)
 // ════════════════════════════════════════════════════════════════════
 const GOLDEN_PRIORITY_ZONES = [
-  { rank: 1, lo: 285880, hi: 290985, frac: 0.565, score: 11.0, weight: 0.50, signals: 'v19-hot ∩ golden-pred ∩ κ-zone ∩ gap-rhythm',  label: 'quadruple convergence' },
-  { rank: 2, lo: 280780, hi: 306300, frac: 0.575, score:  7.5, weight: 0.20, signals: 'v19-hot ∩ κ-zone',               label: 'P1 broadband' },
-  { rank: 3, lo: 127625, hi: 132730, frac: 0.255, score:  6.0, weight: 0.15, signals: 'v19-hot ∩ witness-zone',         label: 'witness anchor' },
-  { rank: 4, lo: 362455, hi: 367560, frac: 0.715, score:  5.5, weight: 0.15, signals: 'mod31=1 ∩ κ-zone ∩ tritone',     label: 'tritone tail' }
+  { rank: 1, lo: 285880, hi: 290985, frac: 0.565, score: 11.0, weight: 0.65, signals: 'v19-hot ∩ golden-pred ∩ κ-zone ∩ gap-rhythm',  label: 'quadruple convergence' },
+  { rank: 2, lo: 280780, hi: 306300, frac: 0.575, score:  7.5, weight: 0.18, signals: 'v19-hot ∩ κ-zone',               label: 'P1 broadband' },
+  { rank: 3, lo: 127625, hi: 132730, frac: 0.255, score:  6.0, weight: 0.085, signals: 'v19-hot ∩ witness-zone',        label: 'witness anchor' },
+  { rank: 4, lo: 362455, hi: 367560, frac: 0.715, score:  5.5, weight: 0.085, signals: 'mod31=1 ∩ κ-zone ∩ tritone',    label: 'tritone tail' }
 ];
-const PRIORITY_BIAS_RATE = 0.30; // 30% of pre-confidence spawns land in a priority zone
+// ◊·κ FOCUS MODE · 2026-05-29 · Simon laptop budget · "win or learn"
+// 4 independent priors converging at bin 56 is the data telling us where the
+// key likely lives. Spreading spawns evenly across 510,510 makes sense on a
+// GPU farm. On a laptop, focus. If the priors are right, we win faster. If
+// they're wrong, we learn faster. Either way the time is well spent.
+//
+// Effective spawn allocation under focus mode:
+//   ~55%  P1 quad-convergence (0.85 × 0.65)
+//   ~15%  P2 v19+κ broadband
+//    ~7%  P3 witness anchor
+//    ~7%  P4 tritone tail
+//   ─────
+//   ~85%  priority bias total
+//    ~1%  golden coverage (token uniform fill remaining)
+//   ~14%  classic A/H/B/U + cross-tab oracle fallback
+//
+// Inline oracle still overrides everything when its confidence climbs ≥0.3.
+// If the oracle finds genuine signal elsewhere, it wins. That's the adaptive
+// safety net — we trust the data we collect more than the priors we walked in with.
+const PRIORITY_BIAS_RATE = 0.85; // FOCUS MODE · was 0.30 · 85% of cold-oracle spawns go priority
 window.GOLDEN_PRIORITY_HITS = [0, 0, 0, 0]; // telemetry · counts spawns per zone
 
 // Sample a 0..1 fraction inside a priority zone (weighted by score)
