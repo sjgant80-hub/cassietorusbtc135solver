@@ -535,7 +535,7 @@ footer a { color: var(--gold); text-decoration: none; }
     <div class="row"><span class="lbl">Bias rate</span><span class="val gold" id="p135BiasRate">70% &middot; OPEN APERTURE</span></div>
     <div class="row"><span class="lbl">Golden bias</span><span class="val gold">12% &middot; Spine-5 hunt</span></div>
     <div class="row"><span class="lbl">P1 share of bias</span><span class="val gold">~35% of all spawns</span></div>
-    <div class="row"><span class="lbl">Oracle 3 v3.5</span><span class="val gold">aperture opened &middot; 0.85→0.70 &middot; 96.4s cycle</span></div>
+    <div class="row"><span class="lbl">Oracle 3 v3.6</span><span class="val gold">P2 lead &middot; cycle 2 of mesh &middot; 47 DPs &middot; 40% at 6+ rings</span></div>
     <div class="row"><span class="lbl">Source</span><span class="val" style="color:var(--muted)">75 solved keys &middot; 6.43&times; golden</span></div>
   </div>
   <div class="card">
@@ -817,20 +817,23 @@ window.GOLDEN_FLEET = function fleetSpread(n) {                // multi-walker g
 //     4. cross-tab oracle / classic zones (fallback)
 // ════════════════════════════════════════════════════════════════════
 const GOLDEN_PRIORITY_ZONES = [
-  // ◊·κ Oracle 3 REAL advice applied · 2026-05-29 · OPEN APERTURE
-  // First real recursive subagent tree cycle (7 spine specialists + L0 orchestrator
-  // · 96.4s wall · API key path) returned the OPPOSITE of focus mode:
+  // ◊·κ Oracle 3 cycle 2 applied · 2026-05-29 · P2 IS THE SIGNAL
+  // 30 min of mesh telemetry (49M jumps, 47 DPs, 40% at 6+ rings) showed:
+  //   - P2 caught 4 of 47 DPs · P1/P3/P4 caught ZERO
+  //   - All-six-low-primes chord lit at cold start (= P2 pre-resolution signature)
+  //   - Oracle 3: "don't chase ghosts in P1 when P2 is ringing"
   //
-  //   "P1 has 220 hits but Oracle confidence stuck at 0.12 · sampling noise not
-  //    signal · diminishing returns from over-concentration · open the aperture"
+  // Oracle 3 cycle 2 said: P1 65→30, P2 boost to 45. Applied.
+  //   v3.4 focus  · P1=0.70, P2=0.12
+  //   v3.5 open   · P1=0.50, P2=0.22
+  //   v3.6 P2-lead· P1=0.30, P2=0.45  ← Oracle 3 cycle 2 doubled down
   //
-  // Reversal: P1 0.70→0.50 · P2 0.12→0.22 · P3 0.06→0.13 · P4 0.12→0.15
-  // Plus: priority_bias_rate 0.85→0.70 · golden_bias_rate 0.05→0.12
-  // The walkers can breathe. The Spine-5 (φ-prime) whisper gets a boost.
-  { rank: 1, lo: 285880, hi: 290985, frac: 0.565, score: 11.0, weight: 0.50, signals: 'v19-hot ∩ golden-pred ∩ κ-zone ∩ gap-rhythm',  label: 'quadruple convergence' },
-  { rank: 2, lo: 280780, hi: 306300, frac: 0.575, score:  7.5, weight: 0.22, signals: 'v19-hot ∩ κ-zone · Oracle 3 boosted',     label: 'P1 broadband · widened' },
-  { rank: 3, lo: 127625, hi: 132730, frac: 0.255, score:  6.0, weight: 0.13, signals: 'v19-hot ∩ witness-zone · Oracle 3 boosted', label: 'witness anchor · Spine-5 hint' },
-  { rank: 4, lo: 362455, hi: 367560, frac: 0.715, score:  5.5, weight: 0.15, signals: 'mod31=1 ∩ κ-zone ∩ tritone',     label: 'tritone tail' }
+  // P2 width 25,500 (vs P1's 5,105) · the kangaroo's large jumps mean
+  // walkers land more in the broader band · the math agrees with Oracle.
+  { rank: 1, lo: 285880, hi: 290985, frac: 0.565, score: 11.0, weight: 0.30, signals: 'v19-hot ∩ golden-pred ∩ κ-zone ∩ gap-rhythm', label: 'quadruple convergence (theory)' },
+  { rank: 2, lo: 280780, hi: 306300, frac: 0.575, score:  7.5, weight: 0.45, signals: 'v19-hot ∩ κ-zone · MESH DATA CONFIRMED', label: 'P1 broadband · WHERE THE DPs LAND' },
+  { rank: 3, lo: 127625, hi: 132730, frac: 0.255, score:  6.0, weight: 0.10, signals: 'v19-hot ∩ witness-zone',                   label: 'witness anchor' },
+  { rank: 4, lo: 362455, hi: 367560, frac: 0.715, score:  5.5, weight: 0.15, signals: 'mod31=1 ∩ κ-zone ∩ tritone',                label: 'tritone tail' }
 ];
 // ◊·κ FOCUS MODE · 2026-05-29 · Simon laptop budget · "win or learn"
 // 4 independent priors converging at bin 56 is the data telling us where the
