@@ -1,0 +1,98 @@
+{
+  "trials": [
+    {
+      "target": 300967,
+      "oneD": {
+        "name": "1D",
+        "initial": 510509.54606482637,
+        "final": 510449.4745624982,
+        "collapse": 1.0001176835422931
+      },
+      "axis": {
+        "name": "7D-axis",
+        "initial": 472345.107099532,
+        "final": 12.825686374080304,
+        "collapse": 36828.05686361581
+      },
+      "lattice": {
+        "name": "127-face",
+        "initial": 510509.54606344725,
+        "final": 510449.2662669501,
+        "collapse": 1.0001180916507884
+      },
+      "rcnested": {
+        "name": "RCNESTED",
+        "initial": 11754.4149123221,
+        "final": 106598.65206378112,
+        "collapse": 0.11026795071751082
+      }
+    },
+    {
+      "target": 111852,
+      "oneD": {
+        "name": "1D",
+        "initial": 510509.54606482637,
+        "final": 510449.26626833156,
+        "collapse": 1.0001180916507835
+      },
+      "axis": {
+        "name": "7D-axis",
+        "initial": 472345.107099532,
+        "final": 42.89953705692356,
+        "collapse": 11010.49427346443
+      },
+      "lattice": {
+        "name": "127-face",
+        "initial": 510509.54606344725,
+        "final": 510449.26626695384,
+        "collapse": 1.000118091650781
+      },
+      "rcnested": {
+        "name": "RCNESTED",
+        "initial": 11754.4149123221,
+        "final": 207775.9188790555,
+        "collapse": 0.05657255651057541
+      }
+    },
+    {
+      "target": 220693,
+      "oneD": {
+        "name": "1D",
+        "initial": 510509.54606482637,
+        "final": 510449.2662683353,
+        "collapse": 1.0001180916507761
+      },
+      "axis": {
+        "name": "7D-axis",
+        "initial": 472345.107099532,
+        "final": 510.0181990878753,
+        "collapse": 926.1338280560998
+      },
+      "lattice": {
+        "name": "127-face",
+        "initial": 510509.54606344725,
+        "final": 510448.9641181687,
+        "collapse": 1.0001186836481943
+      },
+      "rcnested": {
+        "name": "RCNESTED",
+        "initial": 11754.4149123221,
+        "final": 159953.20888487686,
+        "collapse": 0.07348658394707233
+      }
+    }
+  ],
+  "aggregate": {
+    "avg_1d": 1.0001179556146178,
+    "avg_axis": 16254.89498837878,
+    "avg_lattice": 1.0001182889832547,
+    "avg_rcnested": 0.08010903039171953,
+    "speedup_axis_vs_1d": 16252.977858386126,
+    "speedup_lattice_vs_1d": 1.0000003333293188,
+    "speedup_rcnested_vs_1d": 0.08009958219627093,
+    "speedup_rcnested_vs_axis": 0.000004928301932986488
+  },
+  "generated_at": "2026-05-31T10:43:07.876Z",
+  "cosmology": "v20.2-RCNESTED",
+  "attribution": "Kelly Hohman + Thomas Moore (teslasolar/LookingGlass)"
+}
