@@ -1,0 +1,88 @@
+{
+  "trials": [
+    {
+      "target": 211350,
+      "oneD": {
+        "ess_initial": 510509.54606482637,
+        "ess_final": 510449.26626833907,
+        "collapse_ratio": 1.0001180916507688
+      },
+      "axis_7d": {
+        "ess_initial": 472345.107099532,
+        "ess_final": 13.330352846440142,
+        "collapse_ratio": 35433.80378154591,
+        "info_units_per_step": 7
+      },
+      "face_lattice_127": {
+        "ess_initial": 510509.54606344725,
+        "ess_final": 510448.9638597304,
+        "collapse_ratio": 1.0001186841545504,
+        "info_units_per_step": 127,
+        "coherence": 0.36220472440944884,
+        "consensus_position": 268318,
+        "agreement_faces": 46
+      }
+    },
+    {
+      "target": 136128,
+      "oneD": {
+        "ess_initial": 510509.54606482637,
+        "ess_final": 510449.2662683353,
+        "collapse_ratio": 1.0001180916507761
+      },
+      "axis_7d": {
+        "ess_initial": 472345.107099532,
+        "ess_final": 482.6817303458244,
+        "collapse_ratio": 978.5850124493285,
+        "info_units_per_step": 7
+      },
+      "face_lattice_127": {
+        "ess_initial": 510509.54606344725,
+        "ess_final": 510449.2662669438,
+        "collapse_ratio": 1.0001180916508006,
+        "info_units_per_step": 127,
+        "coherence": 0.5590551181102362,
+        "consensus_position": 268318,
+        "agreement_faces": 71
+      }
+    },
+    {
+      "target": 404894,
+      "oneD": {
+        "ess_initial": 510509.54606482637,
+        "ess_final": 510449.4752404938,
+        "collapse_ratio": 1.0001176822139044
+      },
+      "axis_7d": {
+        "ess_initial": 472345.107099532,
+        "ess_final": 44.22339691598916,
+        "collapse_ratio": 10680.887042595174,
+        "info_units_per_step": 7
+      },
+      "face_lattice_127": {
+        "ess_initial": 510509.54606344725,
+        "ess_final": 510449.2662669601,
+        "collapse_ratio": 1.0001180916507686,
+        "info_units_per_step": 127,
+        "coherence": 0.44881889763779526,
+        "consensus_position": 268318,
+        "agreement_faces": 57
+      }
+    }
+  ],
+  "aggregate": {
+    "trials": 3,
+    "steps_per_trial": 500,
+    "avg_1d_collapse": 1.0001179551718165,
+    "avg_axis_collapse": 15697.758612196805,
+    "avg_lattice_collapse": 1.0001182891520397,
+    "speedup_axis_vs_1d": 15695.90719876636,
+    "speedup_lattice_vs_1d": 1.0000003339408332,
+    "theoretical_ceiling": 127,
+    "realised_pct": 0.7874018377486875,
+    "verdict": "NULL · face-lattice does not deliver claimed speedup · debug"
+  },
+  "generated_at": "2026-05-31T10:32:24.609Z",
+  "cosmology": "v20.2-MACCubeFACE127D",
+  "doctrine": "MACCubeFACE127D-ADDENDUM.md"
+}
