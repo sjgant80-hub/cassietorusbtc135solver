@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cassie",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["http-server", "C:\\Users\\sjgan\\Downloads\\cassietorusbtc135solver", "-p", "8765", "-c-1"],
+      "port": 8765
+    }
+  ]
+}
