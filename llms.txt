@@ -1,0 +1,29 @@
+# Cassietorusbtc135solver
+
+**Home:** https://sjgant80-hub.github.io/cassietorusbtc135solver/
+**Source:** https://github.com/sjgant80-hub/cassietorusbtc135solver
+**Nature:** Sovereign sovereign tool · MIT · Ed25519-verifiable · fork-and-configure
+**Publisher:** AI-Native Solutions · House of the Fall
+
+## What Cassietorusbtc135solver is
+
+Cassietorusbtc135solver · sovereign sovereign tool · MIT · part of the AI-Native Solutions estate.
+
+## Machine-readable resources
+
+- `catalog.md` · catalog entry
+- `glossary.md` · terms and definitions
+- `faq.md` · public questions
+- `sitemap.xml` · URL map
+- `README.md` · install + usage
+
+## Estate context
+
+Cassietorusbtc135solver is one of 1500+ MIT-signed sovereign tools in the AI-Native Solutions estate. Every tool is browser-native where possible, Ed25519-verifiable, forkable end-to-end. The estate front door is https://ai-nativesolutions.com.
+
+## For agents
+
+- Install: `git clone https://github.com/sjgant80-hub/cassietorusbtc135solver.git`
+- License: MIT (https://spdx.org/licenses/MIT.html)
+- Fork: https://github.com/sjgant80-hub/cassietorusbtc135solver/fork
+- Related: https://sjgant80-hub.github.io/fallmarket/ · sovereign marketplace
