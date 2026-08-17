@@ -15,7 +15,7 @@
     "import": "node cassie-export.mjs --import",
     "verify": "node verify-math.mjs",
     "relay": "node cassie-relay.mjs",
-    "test": "node test-small-puzzle.mjs",
+    "test": "node --test",
     "analyze": "node puzzle-analysis.mjs"
   },
   "dependencies": {
@@ -28,5 +28,6 @@
   },
   "engines": {
     "node": ">=18"
-  }
+  },
+  "main": "cassie-127.mjs"
 }
